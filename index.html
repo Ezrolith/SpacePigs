@@ -466,7 +466,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.0</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.1</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -708,7 +708,7 @@ new ResizeObserver(resizeCanvas).observe(canvas);
 // --- Difficulty ---
 let difficulty = 'easy';
 const DIFF_SETTINGS = {
-  easy:   { rows: 3, cols: 5, bulletInterval: 2500, enemySpeedMul: 0.7, lives: 5, shields: 4, scoreMul: 1, bossEvery: 8 },
+  easy:   { rows: 3, cols: 5, bulletInterval: 1800, enemySpeedMul: 0.85, lives: 4, shields: 4, scoreMul: 1, bossEvery: 5 },
   normal: { rows: 4, cols: 5, bulletInterval: 1500, enemySpeedMul: 1.0, lives: 3, shields: 3, scoreMul: 2, bossEvery: 5 },
   hard:   { rows: 5, cols: 5, bulletInterval: 800,  enemySpeedMul: 1.4, lives: 2, shields: 2, scoreMul: 3, bossEvery: 3 },
 };
@@ -1659,7 +1659,7 @@ function setupWave() {
   enemyBullets = [];
   enemyDir = 1;
   enemyMoveTimer = 0;
-  enemyMoveInterval = Math.max(200, 800 - (wave - 1) * 30);
+  enemyMoveInterval = Math.max(180, 800 - (wave - 1) * 50);
   enemyDropping = false;
   boss = null;
 
