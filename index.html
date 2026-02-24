@@ -466,7 +466,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.2</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.3</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1828,6 +1828,16 @@ function update(timestamp) {
   let moveSpeed = player.speed;
   if (activePower && activePower.type === 'trotters') moveSpeed *= 1.5;
 
+  // Canvas touch-drag: move pig toward finger position
+  if (canvasTouchX !== null) {
+    const targetX = canvasTouchX - player.w / 2;
+    const dx = targetX - player.x;
+    const dragSpeed = moveSpeed * 2.5;
+    if (Math.abs(dx) > 2) {
+      player.x += Math.sign(dx) * Math.min(Math.abs(dx), dragSpeed);
+    }
+  }
+
   if (keys.left) player.x -= moveSpeed;
   if (keys.right) player.x += moveSpeed;
   player.x = Math.max(0, Math.min(W - player.w, player.x));
@@ -2400,7 +2410,7 @@ document.addEventListener('keyup', e => {
   if (e.key === ' ' || e.key === 'ArrowUp') keys.fire = false;
 });
 
-// Touch controls
+// Touch controls — button strip
 const btnLeft = document.getElementById('btnLeft');
 const btnRight = document.getElementById('btnRight');
 const btnFire = document.getElementById('btnFire');
@@ -2418,6 +2428,55 @@ function addTouchControl(el, keyName) {
 addTouchControl(btnLeft, 'left');
 addTouchControl(btnRight, 'right');
 addTouchControl(btnFire, 'fire');
+
+// --- Canvas touch-drag controls (mobile) ---
+// Touch/drag on canvas moves pig to finger position + auto-fires
+let canvasTouchId = null;
+let canvasTouchX = null;
+
+function canvasTouchToGameX(touch) {
+  const rect = canvas.getBoundingClientRect();
+  const relX = (touch.clientX - rect.left) / rect.width;
+  return relX * W;
+}
+
+canvas.addEventListener('touchstart', e => {
+  if (state !== 'playing') return;
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  canvasTouchId = touch.identifier;
+  canvasTouchX = canvasTouchToGameX(touch);
+  keys.fire = true; // auto-fire while touching
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  if (state !== 'playing' || canvasTouchId === null) return;
+  e.preventDefault();
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === canvasTouchId) {
+      canvasTouchX = canvasTouchToGameX(e.changedTouches[i]);
+      break;
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    if (e.changedTouches[i].identifier === canvasTouchId) {
+      canvasTouchId = null;
+      canvasTouchX = null;
+      // Only stop firing if no button controls are active
+      if (!btnFire.matches(':active')) keys.fire = false;
+      break;
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', e => {
+  canvasTouchId = null;
+  canvasTouchX = null;
+  keys.fire = false;
+}, { passive: false });
 
 // Prevent default on touch to avoid zoom/scroll
 document.addEventListener('touchmove', e => { if (state === 'playing') e.preventDefault(); }, { passive: false });
