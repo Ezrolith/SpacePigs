@@ -466,7 +466,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.1</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.2</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1522,53 +1522,119 @@ function drawBoss(b) {
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
   const s = b.w / 40;
+  const isPepsi = b.catName === 'PEPSI';
 
-  // Giant wolf head
-  ctx.fillStyle = '#555570';
+  // Colors based on cat
+  const furMain = isPepsi ? '#1a1a2a' : '#f0ede8';
+  const furDark = isPepsi ? '#0a0a18' : '#d8d4cc';
+  const furLight = isPepsi ? '#2a2a3a' : '#ffffff';
+  const innerEar = isPepsi ? '#3a2040' : '#f0b0b8';
+  const noseColor = isPepsi ? '#333' : '#f0a0a8';
+
+  // Cat head (round and cute)
+  ctx.fillStyle = furMain;
   ctx.beginPath();
   ctx.arc(cx, cy + 2 * s, b.w * 0.42, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ears
-  ctx.fillStyle = '#444460';
+  // Ears (pointy cat ears)
+  ctx.fillStyle = furMain;
   ctx.beginPath();
-  ctx.moveTo(cx - 14 * s, cy - 6 * s);
-  ctx.lineTo(cx - 8 * s, cy - 18 * s);
-  ctx.lineTo(cx - 2 * s, cy - 6 * s);
+  ctx.moveTo(cx - 14 * s, cy - 4 * s);
+  ctx.lineTo(cx - 10 * s, cy - 19 * s);
+  ctx.lineTo(cx - 3 * s, cy - 6 * s);
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(cx + 2 * s, cy - 6 * s);
-  ctx.lineTo(cx + 8 * s, cy - 18 * s);
-  ctx.lineTo(cx + 14 * s, cy - 6 * s);
+  ctx.moveTo(cx + 3 * s, cy - 6 * s);
+  ctx.lineTo(cx + 10 * s, cy - 19 * s);
+  ctx.lineTo(cx + 14 * s, cy - 4 * s);
+  ctx.fill();
+  // Inner ears
+  ctx.fillStyle = innerEar;
+  ctx.beginPath();
+  ctx.moveTo(cx - 12 * s, cy - 5 * s);
+  ctx.lineTo(cx - 10 * s, cy - 16 * s);
+  ctx.lineTo(cx - 5 * s, cy - 6 * s);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5 * s, cy - 6 * s);
+  ctx.lineTo(cx + 10 * s, cy - 16 * s);
+  ctx.lineTo(cx + 12 * s, cy - 5 * s);
   ctx.fill();
 
-  // Eyes (glowing red)
+  // Eyes (big, cute but evil — slit pupils)
   const eyePulse = 0.7 + Math.sin(Date.now() / 200) * 0.3;
-  ctx.fillStyle = `rgba(255, 50, 50, ${eyePulse})`;
+  // Eye whites (large, cute)
+  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
   ctx.beginPath();
-  ctx.arc(cx - 8 * s, cy - 2 * s, 3 * s, 0, Math.PI * 2);
+  ctx.ellipse(cx - 8 * s, cy - 1 * s, 4.5 * s, 4 * s, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(cx + 8 * s, cy - 2 * s, 3 * s, 0, Math.PI * 2);
+  ctx.ellipse(cx + 8 * s, cy - 1 * s, 4.5 * s, 4 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Slit pupils (evil!)
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(cx - 8 * s, cy - 1 * s, 1.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 8 * s, cy - 1 * s, 1.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye glow
+  ctx.save();
+  ctx.globalAlpha = eyePulse * 0.3;
+  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
+  ctx.beginPath();
+  ctx.arc(cx - 8 * s, cy - 1 * s, 6 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + 8 * s, cy - 1 * s, 6 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Cute nose (small triangle)
+  ctx.fillStyle = noseColor;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 3 * s);
+  ctx.lineTo(cx - 2 * s, cy + 5 * s);
+  ctx.lineTo(cx + 2 * s, cy + 5 * s);
   ctx.fill();
 
-  // Snout
-  ctx.fillStyle = '#666680';
+  // Mouth (smug evil smile)
+  ctx.strokeStyle = isPepsi ? '#555' : '#bba0a0';
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.ellipse(cx, cy + 6 * s, 6 * s, 4 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.moveTo(cx - 5 * s, cy + 7 * s);
+  ctx.quadraticCurveTo(cx - 2 * s, cy + 10 * s, cx, cy + 7 * s);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 7 * s);
+  ctx.quadraticCurveTo(cx + 2 * s, cy + 10 * s, cx + 5 * s, cy + 7 * s);
+  ctx.stroke();
 
-  // Teeth
+  // Whiskers
+  ctx.strokeStyle = isPepsi ? '#555' : '#ccc';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * s, cy + 5 * s); ctx.lineTo(cx - 16 * s, cy + 3 * s); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * s, cy + 6 * s); ctx.lineTo(cx - 16 * s, cy + 7 * s); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5 * s, cy + 5 * s); ctx.lineTo(cx + 16 * s, cy + 3 * s); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5 * s, cy + 6 * s); ctx.lineTo(cx + 16 * s, cy + 7 * s); ctx.stroke();
+
+  // Tiny fangs peeking out
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.moveTo(cx - 4 * s, cy + 8 * s);
-  ctx.lineTo(cx - 3 * s, cy + 12 * s);
-  ctx.lineTo(cx - 2 * s, cy + 8 * s);
+  ctx.moveTo(cx - 3 * s, cy + 7 * s);
+  ctx.lineTo(cx - 2.5 * s, cy + 10 * s);
+  ctx.lineTo(cx - 2 * s, cy + 7 * s);
   ctx.fill();
   ctx.beginPath();
-  ctx.moveTo(cx + 2 * s, cy + 8 * s);
-  ctx.lineTo(cx + 3 * s, cy + 12 * s);
-  ctx.lineTo(cx + 4 * s, cy + 8 * s);
+  ctx.moveTo(cx + 2 * s, cy + 7 * s);
+  ctx.lineTo(cx + 2.5 * s, cy + 10 * s);
+  ctx.lineTo(cx + 3 * s, cy + 7 * s);
   ctx.fill();
 
   // HP bar
@@ -1581,6 +1647,20 @@ function drawBoss(b) {
   const hpRatio = b.hp / b.maxHp;
   ctx.fillStyle = hpRatio > 0.5 ? '#44cc44' : hpRatio > 0.25 ? '#ccaa22' : '#cc3333';
   ctx.fillRect(barX, barY, barW * hpRatio, barH);
+
+  // Boss name floating above
+  const nameY = barY - 8;
+  const nameBob = Math.sin(Date.now() / 300) * 2;
+  ctx.save();
+  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
+  ctx.font = `bold ${Math.max(12, b.w * 0.14)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.shadowColor = isPepsi ? '#ccff44' : '#66ddff';
+  ctx.shadowBlur = 8;
+  ctx.fillText(b.catName, cx, nameY + nameBob);
+  ctx.shadowBlur = 0;
+  ctx.restore();
 }
 
 function drawPowerUp(pu) {
@@ -1664,9 +1744,11 @@ function setupWave() {
   boss = null;
 
   if (isBossWave) {
-    // Boss wave
+    // Boss wave — alternate between Pepsi (black cat) and Cherry (white cat)
     const bw = W * 0.25;
     const bh = bw * 0.8;
+    const bossIndex = Math.floor(wave / ds.bossEvery);
+    const catName = bossIndex % 2 === 1 ? 'PEPSI' : 'CHERRY';
     boss = {
       x: W / 2 - bw / 2,
       y: 20,
@@ -1676,6 +1758,7 @@ function setupWave() {
       speed: 1.5 * ds.enemySpeedMul,
       lastShot: 0,
       shotInterval: Math.max(400, 1200 - wave * 40),
+      catName,
     };
     bossDir = 1;
     playBossAppear();
@@ -1730,7 +1813,7 @@ function setupWave() {
     });
   }
 
-  waveTransition = { text: isBossWave ? `BOSS WAVE ${wave}!` : `WAVE ${wave}`, alpha: 1.0, frame: 0 };
+  waveTransition = { text: isBossWave ? `${boss.catName} ATTACKS!` : `WAVE ${wave}`, alpha: 1.0, frame: 0 };
 }
 
 // --- Update ---
