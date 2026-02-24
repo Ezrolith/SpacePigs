@@ -305,7 +305,7 @@
     border-radius: 4px;
     z-index: 2;
   }
-  .overlay.hidden { display: none; }
+  .overlay.hidden { display: none; pointer-events: none; }
   .overlay-pig { font-size: 40px; margin-bottom: 4px; }
   .overlay-title {
     font-size: 20px;
@@ -466,7 +466,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.3</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.4</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1637,30 +1637,34 @@ function drawBoss(b) {
   ctx.lineTo(cx + 3 * s, cy + 7 * s);
   ctx.fill();
 
-  // HP bar
+  // Boss name below the face
+  const nameY = b.y + b.h + 6;
+  const nameBob = Math.sin(Date.now() / 300) * 2;
+  const nameSize = Math.max(14, b.w * 0.22);
+  ctx.save();
+  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
+  ctx.font = `bold ${nameSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.shadowColor = isPepsi ? '#ccff44' : '#66ddff';
+  ctx.shadowBlur = 10;
+  ctx.fillText(b.catName, cx, nameY + nameBob);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // HP bar below the name
   const barW = b.w * 0.8;
-  const barH = 5;
+  const barH = 6;
   const barX = cx - barW / 2;
-  const barY = b.y - 10;
+  const barY = nameY + nameSize + 6;
   ctx.fillStyle = '#333';
   ctx.fillRect(barX, barY, barW, barH);
   const hpRatio = b.hp / b.maxHp;
   ctx.fillStyle = hpRatio > 0.5 ? '#44cc44' : hpRatio > 0.25 ? '#ccaa22' : '#cc3333';
   ctx.fillRect(barX, barY, barW * hpRatio, barH);
-
-  // Boss name floating above
-  const nameY = barY - 8;
-  const nameBob = Math.sin(Date.now() / 300) * 2;
-  ctx.save();
-  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
-  ctx.font = `bold ${Math.max(12, b.w * 0.14)}px monospace`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.shadowColor = isPepsi ? '#ccff44' : '#66ddff';
-  ctx.shadowBlur = 8;
-  ctx.fillText(b.catName, cx, nameY + nameBob);
-  ctx.shadowBlur = 0;
-  ctx.restore();
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX, barY, barW, barH);
 }
 
 function drawPowerUp(pu) {
@@ -1751,7 +1755,7 @@ function setupWave() {
     const catName = bossIndex % 2 === 1 ? 'PEPSI' : 'CHERRY';
     boss = {
       x: W / 2 - bw / 2,
-      y: 20,
+      y: 15,
       w: bw, h: bh,
       hp: 15 + wave * 3,
       maxHp: 15 + wave * 3,
@@ -2440,8 +2444,13 @@ function canvasTouchToGameX(touch) {
   return relX * W;
 }
 
-canvas.addEventListener('touchstart', e => {
+// Bind to canvas-wrapper so overlays don't block touches
+const canvasWrapper = document.querySelector('.canvas-wrapper');
+
+canvasWrapper.addEventListener('touchstart', e => {
   if (state !== 'playing') return;
+  // Don't intercept if touching an overlay button
+  if (e.target.closest('.overlay:not(.hidden)')) return;
   e.preventDefault();
   const touch = e.changedTouches[0];
   canvasTouchId = touch.identifier;
@@ -2449,7 +2458,7 @@ canvas.addEventListener('touchstart', e => {
   keys.fire = true; // auto-fire while touching
 }, { passive: false });
 
-canvas.addEventListener('touchmove', e => {
+canvasWrapper.addEventListener('touchmove', e => {
   if (state !== 'playing' || canvasTouchId === null) return;
   e.preventDefault();
   for (let i = 0; i < e.changedTouches.length; i++) {
@@ -2460,19 +2469,18 @@ canvas.addEventListener('touchmove', e => {
   }
 }, { passive: false });
 
-canvas.addEventListener('touchend', e => {
+canvasWrapper.addEventListener('touchend', e => {
   for (let i = 0; i < e.changedTouches.length; i++) {
     if (e.changedTouches[i].identifier === canvasTouchId) {
       canvasTouchId = null;
       canvasTouchX = null;
-      // Only stop firing if no button controls are active
-      if (!btnFire.matches(':active')) keys.fire = false;
+      keys.fire = false;
       break;
     }
   }
 }, { passive: false });
 
-canvas.addEventListener('touchcancel', e => {
+canvasWrapper.addEventListener('touchcancel', e => {
   canvasTouchId = null;
   canvasTouchX = null;
   keys.fire = false;
