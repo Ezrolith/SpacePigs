@@ -53,7 +53,7 @@ SpacePigs/
 - **Phone brand:** "SPACE PIGS" displayed at top of device
 - **Pig ship** (player) with ears-as-antenna, snout cockpit, eye shine — drawn on canvas
 - **3 enemy types:** Wolves (top rows, 30pts, grey with red eyes), Foxes (mid rows, 20pts, orange), Farmers (bottom rows, 10pts, hat + angry eyebrows)
-- **4 bosses** cycling every N waves: PEPSI → CHERRY → HARRY → JAKE
+- **4 bosses** in a 7-wave cycle: 4 solo → 2 duo → 1 quad (PEPSI, CHERRY, HARRY, JAKE)
   - **Pepsi** (black cat, lime green eyes) — slit pupils, whiskers, fangs
   - **Cherry** (white cat, cyan eyes) — same cat style, lighter palette
   - **Harry** (black cat, orange eyes) — like Pepsi with different eye colour
@@ -97,4 +97,4 @@ SpacePigs/
 - **Power-up screen-edge glow:** coloured border glow when timed power active
 
 ### Version
-Current version: **v1.17** (shown in screen footer + sw.js cache name)
+Current version: **v1.18** (shown in screen footer + sw.js cache name)

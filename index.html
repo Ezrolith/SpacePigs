@@ -564,7 +564,7 @@
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
       <span class="upgrade-indicators" id="upgradeIndicators"></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.17</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.18</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1460,12 +1460,12 @@ let enemyDropTarget = 0;
 let shields = [];
 
 // Boss
-let boss = null;
-let bossDir = 1;
-let bossHitFlash = 0;
+let bosses = [];            // Array of boss objects (solo=1, duo=2, quad=4)
+let bossTaunts = [];        // Array of { text, color, frame, maxFrames, bossRef }
+let nextSynergyCheck = 0;   // Timestamp for next duo synergy check
+let nextMegaBarrage = 0;    // Timestamp for next quad mega barrage
 
 // Boss special attack visuals
-let bossTaunt = null;       // { text, color, frame, maxFrames }
 let bossClawMarks = [];     // { x1,y1,x2,y2,alpha,color }
 let bossSonicRings = [];    // { x,y,radius,speed,alpha,gapAngle,gapSize,color }
 
@@ -1928,6 +1928,23 @@ function drawShield(shield) {
   }
 }
 
+// Boss cycle: 7-wave repeating pattern (solo → duo → quad)
+const BOSS_CYCLE = [
+  { names: ['PEPSI'],            type: 'solo' },
+  { names: ['CHERRY'],           type: 'solo' },
+  { names: ['HARRY'],            type: 'solo' },
+  { names: ['JAKE'],             type: 'solo' },
+  { names: ['PEPSI', 'CHERRY'],  type: 'duo'  },
+  { names: ['HARRY', 'JAKE'],    type: 'duo'  },
+  { names: ['PEPSI', 'CHERRY', 'HARRY', 'JAKE'], type: 'quad' },
+];
+
+const MULTI_BOSS_CONFIG = {
+  solo: { sizeMul: 0.25, hpMul: 1.0  },
+  duo:  { sizeMul: 0.20, hpMul: 0.65 },
+  quad: { sizeMul: 0.15, hpMul: 0.45 },
+};
+
 // Boss colour/style lookup
 const BOSS_STYLES = {
   PEPSI:  { furMain: '#1a1a2a', furDark: '#0a0a18', innerEar: '#3a2040', nose: '#333', eyeColor: '#ccff44', mouth: '#555', whiskers: '#555', type: 'cat' },
@@ -1942,16 +1959,16 @@ function drawBoss(b) {
   const s = b.w / 40;
   const style = BOSS_STYLES[b.catName] || BOSS_STYLES.PEPSI;
 
-  // Hit flash — white overlay
-  if (bossHitFlash > 0) {
+  // Hit flash — white overlay (per-boss)
+  if (b.hitFlash > 0) {
     ctx.save();
-    ctx.globalAlpha = bossHitFlash / 6 * 0.5;
+    ctx.globalAlpha = b.hitFlash / 6 * 0.5;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(cx, cy, b.w * 0.5, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
-    bossHitFlash--;
+    b.hitFlash--;
   }
 
   if (style.type === 'dog') {
@@ -2458,15 +2475,16 @@ function initGame() {
   activePower = null;
   waveTransition = null;
   deathFlash = 0;
-  boss = null;
+  bosses = [];
+  bossTaunts = [];
+  nextSynergyCheck = 0;
+  nextMegaBarrage = 0;
   topPigBanner = null;
   oinkBombRing = null;
   giantPig = null;
   superPigMode = null;
   giantPigTimer = Date.now();
   deathRings = [];
-  bossHitFlash = 0;
-  bossTaunt = null;
   bossClawMarks = [];
   bossSonicRings = [];
   updateTarget();
@@ -2497,34 +2515,69 @@ function setupWave() {
   enemyMoveTimer = 0;
   enemyMoveInterval = Math.max(180, 800 - (wave - 1) * 50);
   enemyDropping = false;
-  boss = null;
+  bosses = [];
+  bossTaunts = [];
+  nextSynergyCheck = 0;
+  nextMegaBarrage = 0;
 
   if (isBossWave) {
-    // Boss wave — cycle: PEPSI → CHERRY → HARRY → JAKE
-    const bw = W * 0.25;
+    // Boss wave — 7-boss cycle: 4 solo → 2 duo → 1 quad
+    const bossWaveNum = Math.floor(wave / ds.bossEvery);
+    const cycleIndex = (bossWaveNum - 1) % 7;
+    const cycle = BOSS_CYCLE[cycleIndex];
+    const cfg = MULTI_BOSS_CONFIG[cycle.type];
+    const count = cycle.names.length;
+    const now = Date.now();
+
+    const bw = W * cfg.sizeMul;
     const bh = bw * 0.8;
-    const bossIndex = Math.floor(wave / ds.bossEvery);
-    const bossNames = ['PEPSI', 'CHERRY', 'HARRY', 'JAKE'];
-    const catName = bossNames[(bossIndex - 1) % 4];
-    boss = {
-      x: W / 2 - bw / 2,
-      y: 15,
-      w: bw, h: bh,
-      hp: 15 + wave * 3,
-      maxHp: 15 + wave * 3,
-      speed: 1.5 * ds.enemySpeedMul,
-      lastShot: 0,
-      shotInterval: Math.max(400, 1200 - wave * 40),
-      catName,
-      // Special attack system
-      specialTimer: Date.now() + 4000,
-      specialPhase: null,   // null | 'taunt' | 'attack'
-      specialStart: 0,
-      specialType: null,    // 'claw'|'hiss'|'gotcha'|'purr'|'naptime'|'meow'
-      lastSpecialHp: 15 + wave * 3,
-    };
-    bossDir = 1;
+    const baseHp = Math.round((15 + wave * 3) * cfg.hpMul);
+    const spacing = W / (count + 1);
+
+    for (let i = 0; i < count; i++) {
+      bosses.push({
+        x: spacing * (i + 1) - bw / 2,
+        y: 15,
+        w: bw, h: bh,
+        hp: baseHp,
+        maxHp: baseHp,
+        speed: 1.5 * ds.enemySpeedMul,
+        lastShot: 0,
+        shotInterval: Math.max(400, 1200 - wave * 40),
+        catName: cycle.names[i],
+        alive: true,
+        dir: (i % 2 === 0) ? 1 : -1,    // Alternating start directions
+        hitFlash: 0,
+        // Special attack system
+        specialTimer: now + 4000 + i * 1500,  // Staggered
+        specialPhase: null,
+        specialStart: 0,
+        specialType: null,
+        lastSpecialHp: baseHp,
+        // Quad rage boost
+        rageUntil: 0,
+      });
+    }
+
+    // Set synergy/barrage timers
+    if (cycle.type === 'duo') nextSynergyCheck = now + 8000;
+    if (cycle.type === 'quad') nextMegaBarrage = now + 12000;
+
+    // Store wave type on bosses for reference
+    bosses.waveType = cycle.type;
+
     playBossAppear();
+
+    // Banner text
+    let bannerText;
+    if (cycle.type === 'solo') {
+      bannerText = `${cycle.names[0]} ATTACKS!`;
+    } else if (cycle.type === 'duo') {
+      bannerText = `${cycle.names[0]} & ${cycle.names[1]} ATTACK!`;
+    } else {
+      bannerText = 'ALL BOSSES ATTACK!';
+    }
+    waveTransition = { text: bannerText, alpha: 1.0, frame: 0 };
   } else {
     // Normal wave
     const rows = ds.rows;
@@ -2552,6 +2605,7 @@ function setupWave() {
         });
       }
     }
+    waveTransition = { text: `WAVE ${wave}`, alpha: 1.0, frame: 0 };
   }
 
   // Setup shields
@@ -2575,8 +2629,6 @@ function setupWave() {
       ],
     });
   }
-
-  waveTransition = { text: isBossWave ? `${boss.catName} ATTACKS!` : `WAVE ${wave}`, alpha: 1.0, frame: 0 };
 }
 
 // --- Update ---
@@ -2652,11 +2704,11 @@ function update(timestamp) {
     return m.alpha > 0;
   });
 
-  // Update boss taunt text
-  if (bossTaunt) {
-    bossTaunt.frame++;
-    if (bossTaunt.frame >= bossTaunt.maxFrames) bossTaunt = null;
-  }
+  // Update boss taunt texts
+  bossTaunts = bossTaunts.filter(t => {
+    t.frame++;
+    return t.frame < t.maxFrames;
+  });
 
   // Update power-ups (falling)
   powerUps = powerUps.filter(pu => {
@@ -2692,7 +2744,7 @@ function update(timestamp) {
   }
 
   // Giant Pig spawn check
-  if (!giantPig && !superPigMode && !boss && wave >= 3 && wave <= 10 && Date.now() - giantPigTimer >= GIANT_PIG_CHECK_INTERVAL) {
+  if (!giantPig && !superPigMode && bosses.length === 0 && wave >= 3 && wave <= 10 && Date.now() - giantPigTimer >= GIANT_PIG_CHECK_INTERVAL) {
     giantPigTimer = Date.now();
     if (Math.random() < GIANT_PIG_CHANCE) {
       const gpSize = W * 0.15;
@@ -2777,8 +2829,8 @@ function update(timestamp) {
     }
   }
 
-  if (boss) {
-    updateBoss(dt);
+  if (bosses.length > 0) {
+    updateBosses(dt);
   } else {
     updateEnemies(dt);
   }
@@ -2787,7 +2839,7 @@ function update(timestamp) {
   collisionDetection();
 
   // Check wave clear
-  if (!boss && enemies.every(e => !e.alive)) {
+  if (bosses.length === 0 && enemies.every(e => !e.alive)) {
     playWaveComplete();
     wave++;
     waveLabel.textContent = wave;
@@ -2907,12 +2959,12 @@ function getTauntColor(catName) {
   return style ? style.eyeColor : '#ccff44';
 }
 
-function fireSpecialAttack() {
-  if (!boss) return;
-  const cx = boss.x + boss.w / 2;
-  const by = boss.y + boss.h;
-  const type = boss.specialType;
-  const color = getTauntColor(boss.catName);
+function fireSpecialAttackFor(b) {
+  if (!b.alive) return;
+  const cx = b.x + b.w / 2;
+  const by = b.y + b.h;
+  const type = b.specialType;
+  const color = getTauntColor(b.catName);
 
   if (type === 'claw') {
     // 3 diagonal claw lines of 4 bullets each, angled left-to-right
@@ -2976,10 +3028,10 @@ function fireSpecialAttack() {
     // 3 expanding sonic rings with gaps, staggered
     for (let i = 0; i < 3; i++) {
       setTimeout(() => {
-        if (!boss) return;
+        if (!b.alive) return;
         const gapAngle = Math.random() * Math.PI * 2;
         bossSonicRings.push({
-          x: boss.x + boss.w / 2, y: boss.y + boss.h / 2,
+          x: b.x + b.w / 2, y: b.y + b.h / 2,
           radius: 10, speed: 2.5,
           alpha: 0.7, gapAngle, gapSize: 0.8,
           color: '#ccff44',
@@ -3074,72 +3126,175 @@ function fireSpecialAttack() {
   }
 }
 
-function updateBoss(dt) {
-  if (!boss) return;
+function updateBosses(dt) {
+  if (bosses.length === 0) return;
+  const now = Date.now();
+  const waveType = bosses.waveType || 'solo';
+  const livingBosses = bosses.filter(b => b.alive);
+
+  // --- Duo: Synergy Attack Check ---
+  if (waveType === 'duo' && livingBosses.length === 2 && now >= nextSynergyCheck) {
+    nextSynergyCheck = now + 8000;
+    if (Math.random() < 0.15) {
+      // Both bosses must be idle (no special phase)
+      if (!livingBosses[0].specialPhase && !livingBosses[1].specialPhase) {
+        fireSynergyAttack(livingBosses[0], livingBosses[1]);
+      }
+    }
+  }
+
+  // --- Quad: Mega Barrage Check ---
+  if (waveType === 'quad' && livingBosses.length >= 3 && now >= nextMegaBarrage) {
+    nextMegaBarrage = now + 12000;
+    // All living bosses simultaneously fire their special attack
+    livingBosses.forEach(b => {
+      if (!b.specialPhase) {
+        b.specialPhase = 'taunt';
+        b.specialStart = now;
+        b.specialType = pickSpecialAttack(b.catName);
+        const color = getTauntColor(b.catName);
+        bossTaunts.push({ text: getTauntText(b.specialType), color, frame: 0, maxFrames: 72, bossRef: b });
+      }
+    });
+  }
+
+  // Special attack interval varies by wave type
+  const specialIntervalMin = waveType === 'quad' ? 3000 : waveType === 'duo' ? 4500 : 6000;
+  const specialIntervalRange = waveType === 'quad' ? 2000 : waveType === 'duo' ? 2500 : 3000;
+
+  // --- Per-boss update ---
+  livingBosses.forEach(b => {
+    const speedMul = (waveType === 'quad' ? 1.2 : 1.0) * (now < b.rageUntil ? 1.5 : 1.0);
+
+    // --- Special attack state machine ---
+    if (!b.specialPhase) {
+      const hpThreshold = Math.floor(b.hp / (b.maxHp * 0.25));
+      const lastThreshold = Math.floor(b.lastSpecialHp / (b.maxHp * 0.25));
+      const hpTriggered = hpThreshold < lastThreshold && b.hp > 0;
+      if (hpTriggered) b.lastSpecialHp = b.hp;
+
+      if (now >= b.specialTimer || hpTriggered) {
+        b.specialPhase = 'taunt';
+        b.specialStart = now;
+        b.specialType = pickSpecialAttack(b.catName);
+        const color = getTauntColor(b.catName);
+        bossTaunts.push({ text: getTauntText(b.specialType), color, frame: 0, maxFrames: 72, bossRef: b });
+      }
+    }
+
+    if (b.specialPhase === 'taunt') {
+      b.x += b.speed * 0.3 * b.dir * speedMul;
+      if (b.x + b.w > W - 5) b.dir = -1;
+      if (b.x < 5) b.dir = 1;
+
+      if (now - b.specialStart >= 1200) {
+        b.specialPhase = 'attack';
+        b.specialStart = now;
+        fireSpecialAttackFor(b);
+      }
+      return;
+    }
+
+    if (b.specialPhase === 'attack') {
+      b.x += b.speed * 0.5 * b.dir * speedMul;
+      if (b.x + b.w > W - 5) b.dir = -1;
+      if (b.x < 5) b.dir = 1;
+
+      if (now - b.specialStart >= 600) {
+        b.specialPhase = null;
+        b.specialTimer = now + specialIntervalMin + Math.random() * specialIntervalRange;
+      }
+      return;
+    }
+
+    // --- Normal phase ---
+    b.x += b.speed * b.dir * speedMul;
+    if (b.x + b.w > W - 5) b.dir = -1;
+    if (b.x < 5) b.dir = 1;
+
+    // Boss shooting
+    if (now - b.lastShot >= b.shotInterval) {
+      const cx = b.x + b.w / 2;
+      const by = b.y + b.h;
+      // Quad bosses fire 5-spread, others fire 3-spread
+      if (waveType === 'quad') {
+        enemyBullets.push({ x: cx - 1, y: by, w: 3, h: 10, speed: 3.5 });
+        enemyBullets.push({ x: cx - 10, y: by, w: 3, h: 10, speed: 3.5, vx: -1 });
+        enemyBullets.push({ x: cx + 10, y: by, w: 3, h: 10, speed: 3.5, vx: 1 });
+        enemyBullets.push({ x: cx - 18, y: by, w: 3, h: 10, speed: 3.5, vx: -2 });
+        enemyBullets.push({ x: cx + 18, y: by, w: 3, h: 10, speed: 3.5, vx: 2 });
+      } else {
+        enemyBullets.push({ x: cx - 1, y: by, w: 3, h: 10, speed: 3.5 });
+        enemyBullets.push({ x: cx - 10, y: by, w: 3, h: 10, speed: 3.5, vx: -1 });
+        enemyBullets.push({ x: cx + 10, y: by, w: 3, h: 10, speed: 3.5, vx: 1 });
+      }
+      b.lastShot = now;
+    }
+  });
+}
+
+// --- Duo Synergy Attacks ---
+function fireSynergyAttack(b1, b2) {
+  const names = [b1.catName, b2.catName].sort().join('+');
   const now = Date.now();
 
-  // --- Special attack state machine ---
-  // Check triggers: timer elapsed OR HP crossed a 25% threshold
-  if (!boss.specialPhase) {
-    const hpThreshold = Math.floor(boss.hp / (boss.maxHp * 0.25));
-    const lastThreshold = Math.floor(boss.lastSpecialHp / (boss.maxHp * 0.25));
-    const hpTriggered = hpThreshold < lastThreshold && boss.hp > 0;
-    if (hpTriggered) boss.lastSpecialHp = boss.hp;
-
-    if (now >= boss.specialTimer || hpTriggered) {
-      // Enter taunt phase
-      boss.specialPhase = 'taunt';
-      boss.specialStart = now;
-      boss.specialType = pickSpecialAttack(boss.catName);
-      const color = getTauntColor(boss.catName);
-      bossTaunt = { text: getTauntText(boss.specialType), color, frame: 0, maxFrames: 72 };
+  if (names === 'CHERRY+PEPSI') {
+    // "Crossfire" — diagonal bullet lines crossing in center
+    bossTaunts.push({ text: 'CROSSFIRE!', color: '#ff66aa', frame: 0, maxFrames: 72, bossRef: b1 });
+    // Pepsi fires from left side
+    b1.specialPhase = 'attack'; b1.specialStart = now;
+    for (let i = 0; i < 4; i++) {
+      const ang = 0.3 + i * 0.2;
+      enemyBullets.push({ x: b1.x + b1.w / 2, y: b1.y + b1.h, w: 3, h: 8, speed: 4, vx: ang * 3 });
+      bossSonicRings.push({
+        x: b1.x + b1.w / 2, y: b1.y + b1.h / 2,
+        radius: 10, speed: 2, alpha: 0.5, gapAngle: Math.random() * Math.PI * 2, gapSize: 0.8, color: '#ccff44',
+      });
     }
-  }
-
-  if (boss.specialPhase === 'taunt') {
-    // Slow movement, no shooting, wait 1.2s
-    boss.x += boss.speed * 0.3 * bossDir;
-    if (boss.x + boss.w > W - 5) bossDir = -1;
-    if (boss.x < 5) bossDir = 1;
-
-    if (now - boss.specialStart >= 1200) {
-      // Fire the special attack
-      boss.specialPhase = 'attack';
-      boss.specialStart = now;
-      fireSpecialAttack();
+    // Cherry fires from right side
+    b2.specialPhase = 'attack'; b2.specialStart = now;
+    for (let i = 0; i < 4; i++) {
+      const ang = -0.3 - i * 0.2;
+      enemyBullets.push({ x: b2.x + b2.w / 2, y: b2.y + b2.h, w: 3, h: 8, speed: 4, vx: ang * 3 });
+      bossClawMarks.push({
+        x1: b2.x + b2.w / 2, y1: b2.y + b2.h,
+        x2: b2.x + b2.w / 2 + ang * 60, y2: b2.y + b2.h + H * 0.4,
+        alpha: 0.8, color: '#66ddff',
+      });
     }
-    return; // Skip normal shooting during taunt
-  }
+    playBossAppear();
 
-  if (boss.specialPhase === 'attack') {
-    // Brief attack phase — slow movement for 0.6s then resume
-    boss.x += boss.speed * 0.5 * bossDir;
-    if (boss.x + boss.w > W - 5) bossDir = -1;
-    if (boss.x < 5) bossDir = 1;
-
-    if (now - boss.specialStart >= 600) {
-      boss.specialPhase = null;
-      boss.specialTimer = now + 6000 + Math.random() * 3000; // 6-9s until next
+  } else if (names === 'HARRY+JAKE') {
+    // "Pounce & Bark" — Harry fires sleep clouds, Jake fires woof arc through them
+    bossTaunts.push({ text: 'POUNCE & BARK!', color: '#ffaa44', frame: 0, maxFrames: 72, bossRef: b1 });
+    // Harry fires ring of slow naptime clouds
+    b1.specialPhase = 'attack'; b1.specialStart = now;
+    for (let i = 0; i < 8; i++) {
+      const angle = (Math.PI * 2 / 8) * i;
+      enemyBullets.push({
+        x: b1.x + b1.w / 2 + Math.cos(angle) * 15, y: b1.y + b1.h,
+        w: 4, h: 4, speed: 1.2, vx: Math.cos(angle) * 0.6, sleepy: true,
+      });
     }
-    return; // Skip normal shooting during attack
+    // Jake fires woof shockwave
+    b2.specialPhase = 'attack'; b2.specialStart = now;
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.PI * 0.2 + (Math.PI * 0.6 / 5) * i;
+      enemyBullets.push({
+        x: b2.x + b2.w / 2, y: b2.y + b2.h,
+        w: 4, h: 6, speed: 0, vx: Math.cos(angle) * 3.5, vy: Math.sin(angle) * 4.5,
+      });
+    }
+    bossSonicRings.push({
+      x: b2.x + b2.w / 2, y: b2.y + b2.h,
+      radius: 8, speed: 3.5, alpha: 0.6, gapAngle: 0, gapSize: 0, color: '#ffaa44',
+    });
+    playBossAppear();
   }
 
-  // --- Normal phase ---
-  // Move horizontally
-  boss.x += boss.speed * bossDir;
-  if (boss.x + boss.w > W - 5) bossDir = -1;
-  if (boss.x < 5) bossDir = 1;
-
-  // Boss shooting
-  if (now - boss.lastShot >= boss.shotInterval) {
-    const cx = boss.x + boss.w / 2;
-    const by = boss.y + boss.h;
-    // Fire 3 bullets in a spread
-    enemyBullets.push({ x: cx - 1, y: by, w: 3, h: 10, speed: 3.5 });
-    enemyBullets.push({ x: cx - 10, y: by, w: 3, h: 10, speed: 3.5, vx: -1 });
-    enemyBullets.push({ x: cx + 10, y: by, w: 3, h: 10, speed: 3.5, vx: 1 });
-    boss.lastShot = now;
-  }
+  // Reset special timers after synergy
+  setTimeout(() => { if (b1.alive) { b1.specialPhase = null; b1.specialTimer = Date.now() + 4000; } }, 800);
+  setTimeout(() => { if (b2.alive) { b2.specialPhase = null; b2.specialTimer = Date.now() + 4000; } }, 800);
 }
 
 function collisionDetection() {
@@ -3152,28 +3307,42 @@ function collisionDetection() {
 
     let hit = false;
 
-    if (boss) {
-      // vs boss
-      if (rectOverlap(b, boss)) {
-        boss.hp--;
-        bossHitFlash = 6;
-        spawnParticles(b.x, b.y, '#ff6666', 6);
-        playEnemyPop();
-        hit = true;
-        if (boss.hp <= 0) {
-          // Boss defeated
-          const points = 50 * ds.scoreMul;
-          score += points;
-          scoreEl.textContent = score;
-          flashMessages.push({ x: boss.x + boss.w / 2, y: boss.y + boss.h / 2, text: `+${points}`, color: '#ffd700', alpha: 1.0, frame: 0 });
-          spawnParticles(boss.x + boss.w / 2, boss.y + boss.h / 2, '#ff4444', 20);
-          playBossExplode();
-          checkBeatTarget();
-          boss = null;
-          // Next wave
-          wave++;
-          waveLabel.textContent = wave;
-          setupWave();
+    if (bosses.length > 0) {
+      // vs bosses — check each living boss
+      for (let bo of bosses) {
+        if (!bo.alive) continue;
+        if (rectOverlap(b, bo)) {
+          bo.hp--;
+          bo.hitFlash = 6;
+          spawnParticles(b.x, b.y, '#ff6666', 6);
+          playEnemyPop();
+          hit = true;
+          if (bo.hp <= 0) {
+            // Individual boss defeated
+            bo.alive = false;
+            const points = 50 * ds.scoreMul;
+            score += points;
+            scoreEl.textContent = score;
+            flashMessages.push({ x: bo.x + bo.w / 2, y: bo.y + bo.h / 2, text: `${bo.catName} DEFEATED!`, color: '#ffd700', alpha: 1.0, frame: 0 });
+            spawnParticles(bo.x + bo.w / 2, bo.y + bo.h / 2, '#ff4444', 20);
+            playBossExplode();
+            checkBeatTarget();
+
+            // Quad rage boost: surviving bosses get 3s speed boost
+            if (bosses.waveType === 'quad') {
+              const rageEnd = Date.now() + 3000;
+              bosses.forEach(other => { if (other.alive) other.rageUntil = rageEnd; });
+            }
+
+            // Check if ALL bosses are dead → advance wave
+            if (bosses.every(bx => !bx.alive)) {
+              bosses = [];
+              wave++;
+              waveLabel.textContent = wave;
+              setupWave();
+            }
+          }
+          break;
         }
       }
     } else {
@@ -3329,13 +3498,22 @@ function collectPowerUp(pu) {
       score += points;
       spawnParticles(e.x + e.w / 2, e.y + e.h / 2, '#ff69b4', 4);
     });
-    if (boss) {
-      boss.hp -= 5;
-      if (boss.hp <= 0) {
-        score += 50 * ds.scoreMul;
-        spawnParticles(boss.x + boss.w / 2, boss.y + boss.h / 2, '#ff4444', 20);
-        playBossExplode();
-        boss = null;
+    if (bosses.length > 0) {
+      bosses.forEach(bo => {
+        if (!bo.alive) return;
+        bo.hp -= 5;
+        bo.hitFlash = 6;
+        if (bo.hp <= 0) {
+          bo.alive = false;
+          score += 50 * ds.scoreMul;
+          flashMessages.push({ x: bo.x + bo.w / 2, y: bo.y + bo.h / 2, text: `${bo.catName} DEFEATED!`, color: '#ffd700', alpha: 1.0, frame: 0 });
+          spawnParticles(bo.x + bo.w / 2, bo.y + bo.h / 2, '#ff4444', 20);
+          playBossExplode();
+        }
+      });
+      // Check if ALL bosses are dead → advance wave
+      if (bosses.every(bo => !bo.alive)) {
+        bosses = [];
         wave++;
         waveLabel.textContent = wave;
         setupWave();
@@ -3441,8 +3619,8 @@ function draw() {
     else drawFarmer(e.x, e.y, e.w, e.h);
   });
 
-  // Boss
-  if (boss) drawBoss(boss);
+  // Bosses
+  bosses.forEach(b => { if (b.alive) drawBoss(b); });
 
   // Giant Pig
   if (giantPig) drawGiantPig(giantPig);
@@ -3478,27 +3656,30 @@ function draw() {
     ctx.restore();
   });
 
-  // Boss taunt text
-  if (bossTaunt) {
-    const tf = bossTaunt.frame;
-    const tmf = bossTaunt.maxFrames;
+  // Boss taunt texts
+  bossTaunts.forEach(taunt => {
+    const tf = taunt.frame;
+    const tmf = taunt.maxFrames;
     let ta = 1;
     if (tf < 8) ta = tf / 8;
     else if (tf > tmf - 15) ta = (tmf - tf) / 15;
     ctx.save();
     ctx.globalAlpha = ta;
-    ctx.fillStyle = bossTaunt.color;
-    ctx.shadowColor = bossTaunt.color;
+    ctx.fillStyle = taunt.color;
+    ctx.shadowColor = taunt.color;
     ctx.shadowBlur = 20;
     const tSize = Math.min(W * 0.08, 32);
     ctx.font = `bold ${tSize}px monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const bossY = boss ? boss.y + boss.h + 30 : H * 0.25;
+    // Position above respective boss, or center if boss is dead
+    const ref = taunt.bossRef;
+    const bossY = (ref && ref.alive) ? ref.y + ref.h + 30 : H * 0.25;
+    const bossX = (ref && ref.alive) ? ref.x + ref.w / 2 : W / 2;
     const bob = Math.sin(tf * 0.15) * 3;
-    ctx.fillText(bossTaunt.text, W / 2, bossY + bob + tSize);
+    ctx.fillText(taunt.text, bossX, bossY + bob + tSize);
     ctx.restore();
-  }
+  });
 
   // Player
   if (superPigMode) {
