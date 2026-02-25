@@ -477,7 +477,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.9</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.10</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -773,9 +773,9 @@ new ResizeObserver(resizeCanvas).observe(canvas);
 // --- Difficulty ---
 let difficulty = 'easy';
 const DIFF_SETTINGS = {
-  easy:   { rows: 3, cols: 5, bulletInterval: 1800, enemySpeedMul: 0.85, lives: 4, shields: 4, scoreMul: 1, bossEvery: 5 },
-  normal: { rows: 4, cols: 5, bulletInterval: 1500, enemySpeedMul: 1.0, lives: 3, shields: 3, scoreMul: 2, bossEvery: 5 },
-  hard:   { rows: 5, cols: 5, bulletInterval: 800,  enemySpeedMul: 1.4, lives: 2, shields: 2, scoreMul: 3, bossEvery: 3 },
+  easy:   { rows: 3, cols: 5, bulletInterval: 1800, enemySpeedMul: 0.85, lives: 4, shields: 4, scoreMul: 1, bossEvery: 5, maxLives: 5 },
+  normal: { rows: 4, cols: 5, bulletInterval: 1500, enemySpeedMul: 1.0, lives: 3, shields: 3, scoreMul: 2, bossEvery: 5, maxLives: 4 },
+  hard:   { rows: 5, cols: 5, bulletInterval: 800,  enemySpeedMul: 1.4, lives: 2, shields: 2, scoreMul: 3, bossEvery: 3, maxLives: 3 },
 };
 
 // Difficulty buttons
@@ -1268,10 +1268,10 @@ let bossSonicRings = [];    // { x,y,radius,speed,alpha,gapAngle,gapSize,color }
 // Power-ups
 let powerUps = [];
 let activePower = null; // { type, expiry }
-const POWER_TYPES = ['truffle', 'mud', 'oink', 'trotters'];
-const POWER_DURATION = { truffle: 8000, mud: 3000, oink: 0, trotters: 10000 };
-const POWER_COLORS = { truffle: '#8B6914', mud: '#8B4513', oink: '#ff69b4', trotters: '#00cc88' };
-const POWER_LABELS = { truffle: 'TRUFFLE SHOT', mud: 'MUD SHIELD', oink: 'OINK BOMB', trotters: 'SPEED TROT' };
+const POWER_TYPES = ['truffle', 'mud', 'oink', 'trotters', 'mushroom'];
+const POWER_DURATION = { truffle: 8000, mud: 3000, oink: 0, trotters: 10000, mushroom: 0 };
+const POWER_COLORS = { truffle: '#8B6914', mud: '#8B4513', oink: '#ff69b4', trotters: '#00cc88', mushroom: '#ff2244' };
+const POWER_LABELS = { truffle: 'TRUFFLE SHOT', mud: 'MUD SHIELD', oink: 'OINK BOMB', trotters: 'SPEED TROT', mushroom: 'EXTRA LIFE!' };
 
 // Wave transition
 let waveTransition = null; // { text, alpha, frame }
@@ -2011,6 +2011,64 @@ function drawPowerUp(pu) {
   const r = pu.r;
   const pulse = Math.sin(Date.now() / 200) * 2;
 
+  if (pu.type === 'mushroom') {
+    // Custom mushroom drawing — red & white toadstool
+    const s = (r + pulse) / 12;
+    ctx.save();
+
+    // Glow
+    const shimmer = 0.3 + Math.sin(Date.now() / 150) * 0.15;
+    ctx.shadowColor = '#ff2244';
+    ctx.shadowBlur = 8 + pulse;
+    ctx.globalAlpha = shimmer + 0.7;
+
+    // White stem (rounded rect)
+    const stemW = 6 * s, stemH = 8 * s;
+    ctx.fillStyle = '#f0e8d8';
+    ctx.beginPath();
+    const stemX = cx - stemW / 2, stemY = cy;
+    const stemR = 2 * s;
+    ctx.moveTo(stemX + stemR, stemY);
+    ctx.lineTo(stemX + stemW - stemR, stemY);
+    ctx.quadraticCurveTo(stemX + stemW, stemY, stemX + stemW, stemY + stemR);
+    ctx.lineTo(stemX + stemW, stemY + stemH - stemR);
+    ctx.quadraticCurveTo(stemX + stemW, stemY + stemH, stemX + stemW - stemR, stemY + stemH);
+    ctx.lineTo(stemX + stemR, stemY + stemH);
+    ctx.quadraticCurveTo(stemX, stemY + stemH, stemX, stemY + stemH - stemR);
+    ctx.lineTo(stemX, stemY + stemR);
+    ctx.quadraticCurveTo(stemX, stemY, stemX + stemR, stemY);
+    ctx.fill();
+
+    // Red dome cap (half-circle)
+    ctx.fillStyle = '#dd1133';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 9 * s, Math.PI, 0, false);
+    ctx.fill();
+
+    // Cap highlight (lighter red arc at top)
+    ctx.fillStyle = '#ff3355';
+    ctx.beginPath();
+    ctx.arc(cx, cy - 1 * s, 7 * s, Math.PI + 0.3, -0.3, false);
+    ctx.fill();
+
+    // White spots on cap
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx - 4 * s, cy - 5 * s, 2 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 3 * s, cy - 6 * s, 1.5 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx + 1 * s, cy - 3 * s, 1.2 * s, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    return;
+  }
+
   // Golden apple shape
   ctx.fillStyle = '#ffd700';
   ctx.beginPath();
@@ -2686,7 +2744,14 @@ function collisionDetection() {
 
           // Power-up drop (10% chance)
           if (Math.random() < 0.10) {
-            const type = POWER_TYPES[Math.floor(Math.random() * POWER_TYPES.length)];
+            // Weighted selection: 4 original types weight 4 each, mushroom weight 1 (total 17)
+            const roll = Math.random() * 17;
+            let type;
+            if (roll < 4) type = 'truffle';
+            else if (roll < 8) type = 'mud';
+            else if (roll < 12) type = 'oink';
+            else if (roll < 16) type = 'trotters';
+            else type = 'mushroom';
             powerUps.push({
               x: e.x + e.w / 2,
               y: e.y + e.h / 2,
@@ -2783,7 +2848,17 @@ function collectPowerUp(pu) {
   spawnParticles(pu.x, pu.y, POWER_COLORS[pu.type], 8);
   flashMessages.push({ x: pu.x, y: pu.y - 10, text: POWER_LABELS[pu.type], color: POWER_COLORS[pu.type] === '#8B6914' ? '#ffcc44' : POWER_COLORS[pu.type], alpha: 1.0, frame: 0 });
 
-  if (pu.type === 'oink') {
+  if (pu.type === 'mushroom') {
+    // Extra life (capped at maxLives for difficulty)
+    const ds = DIFF_SETTINGS[difficulty];
+    if (lives < ds.maxLives) {
+      lives++;
+      livesLabel.textContent = lives;
+    } else {
+      // Already at max — override flash message
+      flashMessages[flashMessages.length - 1].text = 'MAX LIVES!';
+    }
+  } else if (pu.type === 'oink') {
     // Instant: destroy all enemies on screen
     oinkBombRing = { x: player.x + player.w / 2, y: player.y, radius: 10, alpha: 1.0 };
     const ds = DIFF_SETTINGS[difficulty];

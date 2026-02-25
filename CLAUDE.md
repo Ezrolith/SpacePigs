@@ -64,11 +64,12 @@ SpacePigs/
   - Jake: "JUMP!" (paw prints rain down + shockwave), "FETCH!" (bouncy balls off walls), "WOOF!" (bark shockwave arc)
 - **Specials trigger** every 6-9 seconds + at HP thresholds (75%/50%/25%)
 - **Destructible shields** (cyan energy style, 3x3 grid, 3 HP per cell, pulsing glow)
-- **4 power-ups** (10% drop from killed enemies):
+- **5 power-ups** (10% drop from killed enemies):
   - Truffle Shot: triple spread fire (8s)
   - Mud Shield: absorbs all hits (3s)
   - Oink Bomb: instant screen-clear + 5 boss damage
   - Speed Trot: 1.5x movement speed (10s)
+  - Extra Life Mushroom: grants +1 life, capped at starting+1 (~6% of drops, red & white toadstool)
 - **Wave system** with increasing difficulty (faster enemies, faster shooting)
 - **3 difficulty levels:** Easy (4 lives, 3x5 grid, boss every 5), Normal (3 lives, 4x5, boss every 5), Hard (2 lives, 5x5, boss every 3)
 - **Per-difficulty high scores:** stored in localStorage as `spacePigsHighScore_easy/normal/hard`
@@ -93,4 +94,4 @@ SpacePigs/
 - **Power-up screen-edge glow:** coloured border glow when timed power active
 
 ### Version
-Current version: **v1.9** (shown in screen footer + sw.js cache name)
+Current version: **v1.10** (shown in screen footer + sw.js cache name)
