@@ -560,7 +560,7 @@
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
       <span class="upgrade-indicators" id="upgradeIndicators"></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.14</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.15</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1483,7 +1483,7 @@ const GIANT_PIG_CHECK_INTERVAL = 15000;
 const GIANT_PIG_CHANCE = 0.08;
 const GIANT_PIG_HP = 8;
 const GIANT_PIG_TIME = 7000;
-const SUPER_PIG_DURATION = 15000;
+const SUPER_PIG_DURATION = 5000;
 
 // Input state
 let keys = { left: false, right: false, fire: false };
@@ -2684,7 +2684,7 @@ function update(timestamp) {
   }
 
   // Giant Pig spawn check
-  if (!giantPig && !superPigMode && !boss && wave >= 3 && Date.now() - giantPigTimer >= GIANT_PIG_CHECK_INTERVAL) {
+  if (!giantPig && !superPigMode && !boss && wave >= 3 && wave <= 10 && Date.now() - giantPigTimer >= GIANT_PIG_CHECK_INTERVAL) {
     giantPigTimer = Date.now();
     if (Math.random() < GIANT_PIG_CHANCE) {
       const gpSize = W * 0.15;
