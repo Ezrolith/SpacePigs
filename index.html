@@ -465,6 +465,15 @@
         <div class="overlay-title">PAUSED</div>
         <div class="overlay-text">Press P to continue</div>
       </div>
+      <div class="overlay hidden" id="creditsNotice">
+        <div class="overlay-pig">&#x1FA99;</div>
+        <div class="overlay-title">CREDITS!</div>
+        <div class="overlay-text">Credits can now be earned</div>
+        <div class="overlay-text">from playing and will be</div>
+        <div class="overlay-text">redeemable for exciting</div>
+        <div class="overlay-text">features... coming very soon!</div>
+        <button class="play-again-btn" id="creditsNoticeOk" style="margin-top:10px">OK!</button>
+      </div>
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
@@ -719,6 +728,20 @@ function checkBeatTarget() {
 }
 
 loadAllChamps();
+
+// --- One-time credits notice (REMOVE THIS BLOCK LATER) ---
+if (!localStorage.getItem('spacePigsCreditsNotice_v1')) {
+  localStorage.setItem('spacePigsCreditsNotice_v1', '1');
+  const notice = document.getElementById('creditsNotice');
+  const startOv = document.getElementById('startOverlay');
+  startOv.classList.add('hidden');
+  notice.classList.remove('hidden');
+  document.getElementById('creditsNoticeOk').addEventListener('click', () => {
+    notice.classList.add('hidden');
+    startOv.classList.remove('hidden');
+  });
+}
+// --- END one-time credits notice block ---
 
 // --- Canvas & Game Setup ---
 const canvas = document.getElementById('game');
