@@ -58,11 +58,20 @@ SpacePigs/
   - **Cherry** (white cat, cyan eyes) — same cat style, lighter palette
   - **Harry** (black cat, orange eyes) — like Pepsi with different eye colour
   - **Jake** (friendly black dog) — floppy ears, round eyes, tongue out, wagging tail
+- **Boss cycle:** Solo×4 → Duo (Pepsi+Cherry) → Duo (Harry+Jake) → Quad (all 4), then repeats
+  - Duo bosses: 20% screen width, 65% HP each, independent movement (opposite directions)
+  - Quad bosses: 15% screen width, 45% HP each, 5-spread bullets, 1.2x speed
+  - Individual death: "[NAME] DEFEATED!" flash, wave advances when all bosses dead
+  - Quad rage: surviving bosses get 3s speed boost when one dies
 - **Boss special attacks** with taunts (text appears before attack):
   - Cherry: "CLAW!" (diagonal bullet lines + scratch marks), "HISSS!" (mirrored claw), "GOTCHA!" (targeted burst)
   - Pepsi/Harry: "PURRRR..." (expanding sonic rings with gaps), "NAP TIME..." (sleep cloud), "MEOW!" (circle burst)
   - Jake: "JUMP!" (paw prints rain down + shockwave), "FETCH!" (bouncy balls off walls), "WOOF!" (bark shockwave arc)
-- **Specials trigger** every 6-9 seconds + at HP thresholds (75%/50%/25%)
+- **Duo synergy attacks** (~15% chance every 8s when both alive):
+  - Pepsi+Cherry "CROSSFIRE!" — crossing diagonal bullet patterns from both sides
+  - Harry+Jake "POUNCE & BARK!" — sleep clouds + woof shockwave corridor
+- **Quad mega barrage** (every 12s when 3+ alive): all bosses fire specials simultaneously
+- **Specials trigger** every 6-9s solo / 4.5-7s duo / 3-5s quad + at HP thresholds (75%/50%/25%)
 - **Destructible shields** (cyan energy style, 3x3 grid, 3 HP per cell, pulsing glow)
 - **5 power-ups** (10% drop from killed enemies):
   - Truffle Shot: triple spread fire (8s)
