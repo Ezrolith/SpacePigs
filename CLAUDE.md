@@ -93,4 +93,4 @@ SpacePigs/
 - **Power-up screen-edge glow:** coloured border glow when timed power active
 
 ### Version
-Current version: **v1.8** (shown in screen footer + sw.js cache name)
+Current version: **v1.9** (shown in screen footer + sw.js cache name)
