@@ -670,7 +670,7 @@ async function spendCredits(amount) {
 
 function summonSuperPig() {
   if (state !== 'playing' || superPigMode) return;
-  if (superPigUsedThisRound) return;
+  if (superPigUsedThisRound || wave > 5) return;
   if (userCredits < 100) {
     flashMessages.push({ x: W / 2, y: H * 0.5, text: 'NOT ENOUGH CREDITS', color: '#ff4444', alpha: 1.0, frame: 0 });
     return;
@@ -680,10 +680,7 @@ function summonSuperPig() {
   // Store original size before growing
   const origW = player.w;
   const origH = player.h;
-  // Duration scales down by wave: 8s at waves 1-5, -1s per 5 waves, min 4s
-  const baseDuration = 8000;
-  const reduction = Math.floor((wave - 1) / 5) * 1000;
-  const SUMMON_PIG_DURATION = Math.max(4000, baseDuration - reduction);
+  const SUMMON_PIG_DURATION = 8000; // waves 1-5 only
   superPigMode = { expiry: Date.now() + SUMMON_PIG_DURATION, origW: origW, origH: origH };
   // Grow player 5x
   player.w *= 5;
@@ -704,6 +701,9 @@ function updateSuperPigBtn() {
   if (superPigUsedThisRound) {
     btn.disabled = true;
     btn.textContent = 'USED';
+  } else if (wave > 5) {
+    btn.disabled = true;
+    btn.textContent = 'WAVE 1-5 ONLY';
   } else {
     btn.disabled = (userCredits < 100 || !!superPigMode || state !== 'playing');
     btn.textContent = 'SUPER PIG \u{1FA99}100';

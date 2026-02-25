@@ -71,7 +71,7 @@ SpacePigs/
   - Speed Trot: 1.5x movement speed (10s)
   - Extra Life Mushroom: grants +1 life, capped at starting+1 (~6% of drops, red & white toadstool)
 - **Giant Pig bonus event** (ultra-rare, waves 3-10 only): golden crowned pig bounces around screen for 7 seconds, takes 8 hits to destroy. If destroyed, activates **Super Pig Mode** (5s invulnerability + 500% fire rate + spread shot + golden visual effects). If missed, it escapes. Stops spawning after wave 10.
-- **Summon Super Pig button:** spend 100 credits during gameplay to manually activate Super Pig Mode — player ship grows 5x, invulnerable, 500% fire rate, spread shot. Gold button below controls. Once per round only; duration scales by wave (8s at waves 1-5, -1s per 5 waves, min 4s). Natural Giant Pig (15s) unaffected by these limits.
+- **Summon Super Pig button:** spend 100 credits during gameplay (waves 1-5 only) to activate Super Pig Mode — player ship grows 5x, invulnerable 8s, 500% fire rate, spread shot. Once per round. Button shows "WAVE 1-5 ONLY" after wave 5.
 - **Permanent upgrades shop** (start screen): Extra Life (+1 starting life, 250 credits, non-stackable) and Attack Speed (+10% fire rate per level, stackable 3x for 30%, 250 credits each). Stored in Firestore `users` doc `upgrades` field, persist forever.
 - **Wave system** with increasing difficulty (faster enemies, faster shooting)
 - **3 difficulty levels:** Easy (4 lives, 3x5 grid, boss every 5), Normal (3 lives, 4x5, boss every 5), Hard (2 lives, 5x5, boss every 3)
