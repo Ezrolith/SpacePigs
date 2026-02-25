@@ -403,11 +403,46 @@
   /* Lives display */
   .lives-display { color: var(--t-pale); font-size: 11px; }
 
+  .super-pig-row {
+    display: none;
+    justify-content: center;
+    margin-top: 6px;
+  }
+  .super-pig-btn {
+    background: linear-gradient(180deg, #ffd700, #ffaa00);
+    border: 2px solid #cc8800;
+    border-radius: 10px;
+    color: #4a2800;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    padding: 6px 16px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 2px 8px rgba(255,215,0,0.4), 0 1px 3px rgba(0,0,0,0.2);
+    touch-action: manipulation;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .super-pig-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 1px 4px rgba(255,215,0,0.3);
+  }
+  .super-pig-btn:disabled {
+    background: linear-gradient(180deg, #888, #666);
+    border-color: #555;
+    color: #aaa;
+    box-shadow: none;
+    cursor: default;
+    opacity: 0.6;
+  }
+
   @media (max-height: 600px) {
     .phone { padding: 10px 10px 14px; border-radius: 16px; }
     .phone-brand { font-size: 12px; margin-bottom: 4px; }
     .ctrl-btn-lr { width: 52px; height: 46px; font-size: 18px; }
     .ctrl-btn-fire { width: 66px; height: 46px; font-size: 12px; }
+    .super-pig-btn { font-size: 10px; padding: 5px 12px; }
   }
 </style>
 </head>
@@ -468,16 +503,16 @@
       <div class="overlay hidden" id="creditsNotice">
         <div class="overlay-pig">&#x1FA99;</div>
         <div class="overlay-title">CREDITS!</div>
-        <div class="overlay-text">Credits can now be earned</div>
-        <div class="overlay-text">from playing and will be</div>
-        <div class="overlay-text">redeemable for exciting</div>
-        <div class="overlay-text">features... coming very soon!</div>
+        <div class="overlay-text">Earn credits by playing!</div>
+        <div class="overlay-text">Spend 100 credits to summon</div>
+        <div class="overlay-text">SUPER PIG during battle!</div>
+        <div class="overlay-text">More features coming soon!</div>
         <button class="play-again-btn" id="creditsNoticeOk" style="margin-top:10px">OK!</button>
       </div>
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.11</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.12</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -485,6 +520,9 @@
     <div class="ctrl-btn ctrl-btn-lr" id="btnLeft">&#9664;</div>
     <div class="ctrl-btn ctrl-btn-fire" id="btnFire">FIRE</div>
     <div class="ctrl-btn ctrl-btn-lr" id="btnRight">&#9654;</div>
+  </div>
+  <div class="super-pig-row" id="superPigRow">
+    <button class="super-pig-btn" id="btnSuperPig" disabled>SUPER PIG &#x1FA99;100</button>
   </div>
   <div class="controls-hint">Arrow Keys + Space to fire &bull; P to pause</div>
   <div class="pig-feet">
@@ -556,6 +594,49 @@ async function addCredits(earned) {
       lastPlayed: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
   } catch(e) { console.warn('Credits save:', e); }
+}
+
+async function spendCredits(amount) {
+  if (!db || !currentUser || amount <= 0) return false;
+  if (userCredits < amount) return false;
+  userCredits -= amount;
+  updateCreditsDisplay();
+  try {
+    await db.collection('users').doc(currentUser.uid).set({
+      credits: firebase.firestore.FieldValue.increment(-amount),
+      lastPlayed: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+  } catch(e) { console.warn('Credits spend:', e); }
+  return true;
+}
+
+function summonSuperPig() {
+  if (state !== 'playing' || superPigMode) return;
+  if (userCredits < 100) {
+    flashMessages.push({ x: W / 2, y: H * 0.5, text: 'NOT ENOUGH CREDITS', color: '#ff4444', alpha: 1.0, frame: 0 });
+    return;
+  }
+  spendCredits(100);
+  // Store original size before growing
+  const origW = player.w;
+  const origH = player.h;
+  superPigMode = { expiry: Date.now() + SUPER_PIG_DURATION, origW: origW, origH: origH };
+  // Grow player 5x
+  player.w *= 5;
+  player.h *= 5;
+  // Re-center and clamp to screen
+  player.x -= (player.w - origW) / 2;
+  player.y = H - player.h - 10;
+  player.x = Math.max(0, Math.min(W - player.w, player.x));
+  playWaveComplete();
+  flashMessages.push({ x: W / 2, y: H * 0.35, text: 'SUPER PIG MODE!', color: '#ffd700', alpha: 1.0, frame: 0 });
+  spawnParticles(W / 2, H * 0.5, '#ffd700', 20);
+  updateSuperPigBtn();
+}
+
+function updateSuperPigBtn() {
+  const btn = document.getElementById('btnSuperPig');
+  if (btn) btn.disabled = (userCredits < 100 || !!superPigMode || state !== 'playing');
 }
 
 function updateCreditsDisplay() {
@@ -2469,8 +2550,17 @@ function update(timestamp) {
 
   // Expire Super Pig Mode
   if (superPigMode && Date.now() > superPigMode.expiry) {
+    // Restore original player size if we stored it (from summon)
+    if (superPigMode.origW) {
+      player.w = superPigMode.origW;
+      player.h = superPigMode.origH;
+      // Re-center and clamp position
+      player.x = Math.max(0, Math.min(W - player.w, player.x));
+      player.y = H - player.h - 10;
+    }
     superPigMode = null;
     flashMessages.push({ x: W / 2, y: H * 0.4, text: 'SUPER PIG OVER', color: '#cccccc', alpha: 1.0, frame: 0 });
+    updateSuperPigBtn();
   }
 
   // Giant Pig spawn check
@@ -3152,6 +3242,7 @@ function gameOver() {
   cancelAnimationFrame(gameLoop);
   stopMusic();
   playGameOver();
+  document.getElementById('superPigRow').style.display = 'none';
 
   gameOverScore = score;
   gameOverWave = wave;
@@ -3535,6 +3626,9 @@ function draw() {
       ctx.restore();
     }
   }
+
+  // Update Super Pig button state
+  updateSuperPigBtn();
 }
 
 // --- Start Game ---
@@ -3549,6 +3643,8 @@ function startGame() {
   if (!musicMuted) startMusic();
   resizeCanvas();
   initGame();
+  document.getElementById('superPigRow').style.display = 'flex';
+  updateSuperPigBtn();
   lastFrameTime = performance.now();
   gameLoop = requestAnimationFrame(update);
 }
@@ -3599,6 +3695,12 @@ function addTouchControl(el, keyName) {
 addTouchControl(btnLeft, 'left');
 addTouchControl(btnRight, 'right');
 addTouchControl(btnFire, 'fire');
+
+// Super Pig button
+const btnSuperPig = document.getElementById('btnSuperPig');
+let superPigTouched = false;
+btnSuperPig.addEventListener('touchstart', e => { e.preventDefault(); superPigTouched = true; summonSuperPig(); }, { passive: false });
+btnSuperPig.addEventListener('click', e => { e.preventDefault(); if (!superPigTouched) summonSuperPig(); superPigTouched = false; });
 
 // --- Canvas touch-drag controls (mobile) ---
 // Touch/drag on canvas moves pig to finger position + auto-fires
@@ -3663,10 +3765,13 @@ function togglePause() {
     cancelAnimationFrame(gameLoop);
     stopMusic();
     pauseOverlay.classList.remove('hidden');
+    document.getElementById('superPigRow').style.display = 'none';
   } else if (state === 'paused') {
     state = 'playing';
     pauseOverlay.classList.add('hidden');
     if (!musicMuted) startMusic();
+    document.getElementById('superPigRow').style.display = 'flex';
+    updateSuperPigBtn();
     lastFrameTime = performance.now();
     gameLoop = requestAnimationFrame(update);
   }
