@@ -44,6 +44,7 @@ SpacePigs/
   firestore.indexes.json - Composite index: difficulty + score desc
   icon.svg               - App icon (pig themed)
   index.html             - THE ENTIRE GAME (~3000+ lines: CSS + HTML + JS)
+  scores.html            - "Ezrolith Arcade" combined leaderboard page (HannaPig + SpacePigs)
   manifest.json          - PWA manifest
   sw.js                  - Service worker (network-first strategy)
 ```
@@ -92,4 +93,4 @@ SpacePigs/
 - **Power-up screen-edge glow:** coloured border glow when timed power active
 
 ### Version
-Current version: **v1.7** (shown in screen footer + sw.js cache name)
+Current version: **v1.8** (shown in screen footer + sw.js cache name)

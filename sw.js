@@ -1,7 +1,8 @@
-const CACHE_NAME = 'spacepigs-v1.7';
+const CACHE_NAME = 'spacepigs-v1.8';
 const ASSETS = [
   './',
   './index.html',
+  './scores.html',
   './manifest.json',
   './icon.svg'
 ];
