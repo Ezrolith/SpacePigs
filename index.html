@@ -560,7 +560,7 @@
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
       <span class="upgrade-indicators" id="upgradeIndicators"></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.15</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.16</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -2404,26 +2404,28 @@ function drawGiantPig(gp) {
   ctx.fill();
   ctx.shadowBlur = 0;
 
-  // HP bar underneath
-  const barW = gp.w * 0.8;
-  const barH = 5;
-  const barX = cx - barW / 2;
-  const barY = gp.y + gp.h + 6;
-  const hpFrac = gp.hp / gp.maxHp;
-  ctx.fillStyle = '#333333';
-  ctx.fillRect(barX, barY, barW, barH);
-  ctx.fillStyle = hpFrac > 0.5 ? '#44ff44' : hpFrac > 0.25 ? '#ffcc00' : '#ff3333';
-  ctx.fillRect(barX, barY, barW * hpFrac, barH);
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(barX, barY, barW, barH);
+  // HP bar + countdown ring (only for actual Giant Pig, not player Super Pig)
+  if (gp.hp !== undefined) {
+    const barW = gp.w * 0.8;
+    const barH = 5;
+    const barX = cx - barW / 2;
+    const barY = gp.y + gp.h + 6;
+    const hpFrac = gp.hp / gp.maxHp;
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = hpFrac > 0.5 ? '#44ff44' : hpFrac > 0.25 ? '#ffcc00' : '#ff3333';
+    ctx.fillRect(barX, barY, barW * hpFrac, barH);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
 
-  // Countdown timer ring
-  ctx.strokeStyle = urgentFlash ? '#ff3333' : '#ffd700';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * timeFrac);
-  ctx.stroke();
+    // Countdown timer ring
+    ctx.strokeStyle = urgentFlash ? '#ff3333' : '#ffd700';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * timeFrac);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
@@ -2598,7 +2600,7 @@ function update(timestamp) {
   player.x = Math.max(0, Math.min(W - player.w, player.x));
 
   // Player fire
-  let fireRate = superPigMode ? PLAYER_FIRE_RATE / 5 : PLAYER_FIRE_RATE;
+  let fireRate = superPigMode ? PLAYER_FIRE_RATE / 2 : PLAYER_FIRE_RATE;
   if (userUpgrades.attackSpeed > 0) fireRate *= (1 - userUpgrades.attackSpeed * 0.1);
   if (keys.fire && Date.now() - playerFireCooldown >= fireRate) {
     firePlayerBullet();
@@ -2740,8 +2742,15 @@ function update(timestamp) {
           giantPig.hp--;
           spawnParticles(b.x + b.w / 2, b.y, '#ffd700', 3);
           if (giantPig.hp <= 0) {
-            // Super Pig Mode activated!
-            superPigMode = { expiry: Date.now() + SUPER_PIG_DURATION };
+            // Super Pig Mode activated — grow 5x like summoned version
+            const origW = player.w;
+            const origH = player.h;
+            superPigMode = { expiry: Date.now() + SUPER_PIG_DURATION, origW: origW, origH: origH };
+            player.w *= 5;
+            player.h *= 5;
+            player.x -= (player.w - origW) / 2;
+            player.y = H - player.h - 10;
+            player.x = Math.max(0, Math.min(W - player.w, player.x));
             // Score bonus
             const gpPoints = 100 * DIFF_SETTINGS[difficulty].scoreMul;
             score += gpPoints;
@@ -2787,7 +2796,7 @@ function update(timestamp) {
 }
 
 function firePlayerBullet() {
-  const maxBullets = superPigMode ? 15 : 3;
+  const maxBullets = superPigMode ? 6 : 3;
   if (playerBullets.length >= maxBullets) return;
   playPew();
   const bw = 4;
@@ -3487,26 +3496,16 @@ function draw() {
 
   // Player
   if (superPigMode) {
-    // Golden aura around player
-    ctx.save();
-    const px = player.x + player.w / 2;
-    const py = player.y + player.h / 2;
-    const auraR = player.w * 0.9;
-    const auraGrad = ctx.createRadialGradient(px, py, player.w * 0.3, px, py, auraR);
-    auraGrad.addColorStop(0, 'rgba(255,215,0,0.3)');
-    auraGrad.addColorStop(0.6, 'rgba(255,170,0,0.15)');
-    auraGrad.addColorStop(1, 'rgba(255,215,0,0)');
-    ctx.fillStyle = auraGrad;
-    ctx.beginPath();
-    ctx.arc(px, py, auraR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    // Draw golden crowned pig (matching Giant Pig style)
+    const gpFake = { x: player.x, y: player.y, w: player.w, h: player.h, spawnTime: 0, maxTime: Infinity };
+    drawGiantPig(gpFake);
     // Gold particle trail
     if (Math.random() < 0.4) {
       spawnParticles(player.x + Math.random() * player.w, player.y + player.h * 0.8, '#ffd700', 1);
     }
+  } else {
+    drawPigShip(player.x, player.y, player.w, player.h);
   }
-  drawPigShip(player.x, player.y, player.w, player.h);
 
   // Player bullets (acorns)
   playerBullets.forEach(b => {
