@@ -466,7 +466,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.4</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.5</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1193,6 +1193,7 @@ let shields = [];
 // Boss
 let boss = null;
 let bossDir = 1;
+let bossHitFlash = 0;
 
 // Power-ups
 let powerUps = [];
@@ -1219,20 +1220,103 @@ loadHighScore();
 
 // --- Drawing Functions ---
 
-function drawStarfield() {
-  // Simple seeded starfield
-  ctx.fillStyle = '#ffffff';
-  const seed = 42;
-  for (let i = 0; i < 40; i++) {
-    const sx = ((seed * (i + 1) * 7919) % W);
-    const sy = ((seed * (i + 1) * 6271) % H);
-    const brightness = 0.2 + ((i * 3571) % 10) / 15;
-    const size = 1 + ((i * 2971) % 3) * 0.5;
-    ctx.globalAlpha = brightness;
-    ctx.fillRect(sx, sy, size, size);
-  }
+// --- Parallax Background System ---
+const STAR_COLORS = ['#ffffff', '#aaddff', '#8888ff', '#bb88ff', '#ffffaa', '#88ffcc'];
+
+// Layer 1: Distant dim stars (slowest)
+const bgStarsFar = [];
+for (let i = 0; i < 30; i++) {
+  bgStarsFar.push({
+    x: ((42 * (i + 1) * 7919) % 1000) / 1000,
+    y: Math.random(),
+    size: 0.5 + Math.random() * 1,
+    color: STAR_COLORS[i % 3 === 0 ? 1 : i % 3 === 1 ? 2 : 3],
+    brightness: 0.15 + Math.random() * 0.25,
+    speed: 0.15 + Math.random() * 0.1,
+  });
+}
+
+// Layer 2: Nebula clouds (mid speed)
+const bgNebulae = [];
+for (let i = 0; i < 6; i++) {
+  bgNebulae.push({
+    x: Math.random(),
+    y: Math.random(),
+    rx: 0.08 + Math.random() * 0.12,
+    ry: 0.05 + Math.random() * 0.08,
+    color: ['rgba(100,50,180,', 'rgba(40,80,160,', 'rgba(150,40,100,', 'rgba(30,100,140,', 'rgba(80,40,140,', 'rgba(140,60,120,'][i],
+    alpha: 0.04 + Math.random() * 0.04,
+    speed: 0.3 + Math.random() * 0.2,
+  });
+}
+
+// Layer 3: Bright foreground stars (fastest)
+const bgStarsNear = [];
+for (let i = 0; i < 25; i++) {
+  bgStarsNear.push({
+    x: ((73 * (i + 1) * 4967) % 1000) / 1000,
+    y: Math.random(),
+    size: 1 + Math.random() * 2,
+    color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
+    brightness: 0.4 + Math.random() * 0.5,
+    twinkleSpeed: 1 + Math.random() * 3,
+    twinkleOffset: Math.random() * Math.PI * 2,
+    speed: 0.5 + Math.random() * 0.3,
+  });
+}
+
+let bgScrollOffset = 0;
+
+function drawParallaxBackground() {
+  const now = Date.now() / 1000;
+  bgScrollOffset += 0.4;
+
+  // Layer 1: Distant dim stars
+  bgStarsFar.forEach(s => {
+    const sx = s.x * W;
+    const sy = ((s.y * H + bgScrollOffset * s.speed * 30) % (H + 10)) - 5;
+    ctx.globalAlpha = s.brightness;
+    ctx.fillStyle = s.color;
+    ctx.fillRect(sx, sy, s.size, s.size);
+  });
+
+  // Layer 2: Nebula clouds
+  bgNebulae.forEach(n => {
+    const nx = n.x * W;
+    const ny = ((n.y * H + bgScrollOffset * n.speed * 20) % (H + H * 0.3)) - H * 0.15;
+    const rx = n.rx * W;
+    const ry = n.ry * H;
+    const grad = ctx.createRadialGradient(nx, ny, 0, nx, ny, Math.max(rx, ry));
+    grad.addColorStop(0, n.color + (n.alpha + 0.02) + ')');
+    grad.addColorStop(0.5, n.color + n.alpha + ')');
+    grad.addColorStop(1, n.color + '0)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = grad;
+    ctx.fillRect(nx - rx * 1.5, ny - ry * 1.5, rx * 3, ry * 3);
+  });
+
+  // Layer 3: Bright foreground stars with twinkling
+  bgStarsNear.forEach(s => {
+    const sx = s.x * W;
+    const sy = ((s.y * H + bgScrollOffset * s.speed * 30) % (H + 10)) - 5;
+    const twinkle = 0.6 + 0.4 * Math.sin(now * s.twinkleSpeed + s.twinkleOffset);
+    ctx.globalAlpha = s.brightness * twinkle;
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.arc(sx, sy, s.size * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // Glow
+    ctx.globalAlpha = s.brightness * twinkle * 0.3;
+    ctx.beginPath();
+    ctx.arc(sx, sy, s.size * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
   ctx.globalAlpha = 1;
 }
+
+// --- Death Rings (expanding rings on enemy death) ---
+let deathRings = [];
 
 function drawPigShip(x, y, w, h) {
   const cx = x + w / 2;
@@ -1469,49 +1553,91 @@ function drawFarmer(x, y, w, h) {
 }
 
 function drawAcornBullet(x, y, r) {
+  ctx.save();
+  // Glow
+  ctx.shadowColor = '#ccaa22';
+  ctx.shadowBlur = 10;
   // Acorn body
-  ctx.fillStyle = '#8B6914';
+  ctx.fillStyle = '#ccaa22';
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
+  ctx.shadowBlur = 0;
   // Cap
-  ctx.fillStyle = '#654B0F';
+  ctx.fillStyle = '#ffdd44';
   ctx.beginPath();
   ctx.arc(x, y - r * 0.5, r * 0.8, Math.PI, 0);
   ctx.fill();
+  // Trail
+  ctx.globalAlpha = 0.3;
+  ctx.fillStyle = '#ccaa22';
+  ctx.beginPath();
+  ctx.moveTo(x - r * 0.4, y + r);
+  ctx.lineTo(x, y + r * 4);
+  ctx.lineTo(x + r * 0.4, y + r);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawPitchforkBullet(x, y, h) {
   const w = h * 0.3;
+  ctx.save();
+  // Glow
+  ctx.shadowColor = '#ff4422';
+  ctx.shadowBlur = 8;
   // Handle
-  ctx.fillStyle = '#8B6914';
+  ctx.fillStyle = '#cc4422';
   ctx.fillRect(x - 1, y, 2, h);
   // Prongs
-  ctx.fillStyle = '#888';
+  ctx.fillStyle = '#ff6644';
   ctx.fillRect(x - w / 2, y, 1.5, h * 0.4);
   ctx.fillRect(x - 0.75, y, 1.5, h * 0.4);
   ctx.fillRect(x + w / 2 - 1.5, y, 1.5, h * 0.4);
+  ctx.shadowBlur = 0;
+  // Trail
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#ff4422';
+  ctx.beginPath();
+  ctx.moveTo(x - w * 0.3, y);
+  ctx.lineTo(x, y - h * 2);
+  ctx.lineTo(x + w * 0.3, y);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawShield(shield) {
   const cellW = shield.w / 3;
   const cellH = shield.h / 3;
+  const pulse = 0.85 + 0.15 * Math.sin(Date.now() / 400);
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {
       if (shield.cells[r][c] <= 0) continue;
       const hp = shield.cells[r][c];
-      const alpha = hp / 3;
-      ctx.fillStyle = `rgba(139, 100, 60, ${0.3 + alpha * 0.7})`;
+      const hpRatio = hp / 3;
       const sx = shield.x + c * cellW;
       const sy = shield.y + r * cellH;
+      const cx = sx + cellW / 2;
+      const cy = sy + cellH / 2;
+      // Outer glow
+      ctx.save();
+      ctx.globalAlpha = hpRatio * 0.2 * pulse;
+      ctx.fillStyle = '#44ddff';
       ctx.beginPath();
-      ctx.ellipse(sx + cellW / 2, sy + cellH / 2, cellW / 2, cellH / 2, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx, cy, cellW * 0.7, cellH * 0.7, 0, 0, Math.PI * 2);
       ctx.fill();
-      // Mud texture
+      ctx.restore();
+      // Main cell
+      const g = Math.round(140 + hpRatio * 115);
+      const b = Math.round(180 + hpRatio * 75);
+      ctx.fillStyle = `rgba(40, ${g}, ${b}, ${(0.3 + hpRatio * 0.6) * pulse})`;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, cellW / 2, cellH / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Inner highlight
       if (hp >= 2) {
-        ctx.fillStyle = `rgba(100, 70, 40, ${alpha * 0.5})`;
+        ctx.fillStyle = `rgba(150, 240, 255, ${hpRatio * 0.3 * pulse})`;
         ctx.beginPath();
-        ctx.arc(sx + cellW * 0.3, sy + cellH * 0.4, cellW * 0.15, 0, Math.PI * 2);
+        ctx.arc(cx - cellW * 0.1, cy - cellH * 0.1, cellW * 0.15, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1523,6 +1649,18 @@ function drawBoss(b) {
   const cy = b.y + b.h / 2;
   const s = b.w / 40;
   const isPepsi = b.catName === 'PEPSI';
+
+  // Hit flash — white overlay
+  if (bossHitFlash > 0) {
+    ctx.save();
+    ctx.globalAlpha = bossHitFlash / 6 * 0.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx, cy, b.w * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    bossHitFlash--;
+  }
 
   // Colors based on cat
   const furMain = isPepsi ? '#1a1a2a' : '#f0ede8';
@@ -1717,6 +1855,8 @@ function initGame() {
   boss = null;
   topPigBanner = null;
   oinkBombRing = null;
+  deathRings = [];
+  bossHitFlash = 0;
   updateTarget();
   setupPlayer();
   setupWave();
@@ -2020,7 +2160,8 @@ function collisionDetection() {
       // vs boss
       if (rectOverlap(b, boss)) {
         boss.hp--;
-        spawnParticles(b.x, b.y, '#ff6666', 4);
+        bossHitFlash = 6;
+        spawnParticles(b.x, b.y, '#ff6666', 6);
         playEnemyPop();
         hit = true;
         if (boss.hp <= 0) {
@@ -2052,8 +2193,11 @@ function collisionDetection() {
           points *= ds.scoreMul;
           score += points;
           scoreEl.textContent = score;
-          flashMessages.push({ x: e.x + e.w / 2, y: e.y, text: `+${points}`, color: '#ffcc00', alpha: 1.0, frame: 0 });
-          spawnParticles(e.x + e.w / 2, e.y + e.h / 2, e.type === 'wolf' ? '#8888aa' : e.type === 'fox' ? '#cc6633' : '#dda088', 6);
+          const hitColor = e.type === 'wolf' ? '#aaaaee' : e.type === 'fox' ? '#ffaa44' : '#ffddaa';
+          flashMessages.push({ x: e.x + e.w / 2, y: e.y, text: `+${points}`, color: hitColor, alpha: 1.0, frame: 0 });
+          const deathColor = e.type === 'wolf' ? '#8888ee' : e.type === 'fox' ? '#ff8844' : '#ffcc88';
+          spawnParticles(e.x + e.w / 2, e.y + e.h / 2, deathColor, 8);
+          deathRings.push({ x: e.x + e.w / 2, y: e.y + e.h / 2, radius: 3, maxRadius: e.w * 1.2, alpha: 0.7, color: deathColor });
           playEnemyPop();
           checkBeatTarget();
 
@@ -2154,7 +2298,7 @@ function bulletHitShield(bullet, shield) {
 function collectPowerUp(pu) {
   playPowerUp();
   spawnParticles(pu.x, pu.y, POWER_COLORS[pu.type], 8);
-  flashMessages.push({ x: pu.x, y: pu.y - 10, text: POWER_LABELS[pu.type], color: '#ffd700', alpha: 1.0, frame: 0 });
+  flashMessages.push({ x: pu.x, y: pu.y - 10, text: POWER_LABELS[pu.type], color: POWER_COLORS[pu.type] === '#8B6914' ? '#ffcc44' : POWER_COLORS[pu.type], alpha: 1.0, frame: 0 });
 
   if (pu.type === 'oink') {
     // Instant: destroy all enemies on screen
@@ -2193,7 +2337,9 @@ function playerHit() {
   livesLabel.textContent = lives;
   deathFlash = 1.0;
   playPlayerHit();
-  spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#f5a0b8', 8);
+  spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#f5a0b8', 12);
+  spawnParticles(player.x + player.w / 2, player.y + player.h / 2, '#ffffff', 6);
+  deathRings.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, radius: 5, maxRadius: player.w * 2, alpha: 0.8, color: '#ff6688' });
 
   // Screen shake
   const frame = document.querySelector('.screen-frame');
@@ -2245,12 +2391,17 @@ function draw() {
   // Background
   ctx.fillStyle = '#0a0a1e';
   ctx.fillRect(0, 0, W, H);
-  drawStarfield();
+  drawParallaxBackground();
 
-  // Death flash
+  // Death flash (white then red)
   if (deathFlash > 0) {
     ctx.save();
-    ctx.globalAlpha = deathFlash * 0.4;
+    if (deathFlash > 0.7) {
+      ctx.globalAlpha = (deathFlash - 0.7) / 0.3 * 0.5;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.globalAlpha = deathFlash * 0.35;
     ctx.fillStyle = '#ff0000';
     ctx.fillRect(0, 0, W, H);
     ctx.restore();
@@ -2298,6 +2449,22 @@ function draw() {
     ctx.restore();
   }
 
+  // Death rings
+  deathRings = deathRings.filter(dr => {
+    dr.radius += 2.5;
+    dr.alpha *= 0.92;
+    if (dr.radius > dr.maxRadius || dr.alpha < 0.02) return false;
+    ctx.save();
+    ctx.globalAlpha = dr.alpha;
+    ctx.strokeStyle = dr.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(dr.x, dr.y, dr.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return true;
+  });
+
   // Particles
   updateAndDrawParticles();
 
@@ -2325,11 +2492,15 @@ function draw() {
               : waveTransition.frame > 60 ? (80 - waveTransition.frame) / 20 : 1;
       ctx.save();
       ctx.globalAlpha = a;
-      ctx.fillStyle = '#ffd700';
+      const isBossText = waveTransition.text.includes('ATTACKS');
+      ctx.fillStyle = isBossText ? '#ff5555' : '#44ddff';
       ctx.font = `bold ${W * 0.06}px monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      ctx.shadowColor = isBossText ? '#ff2222' : '#22aadd';
+      ctx.shadowBlur = 15;
       ctx.fillText(waveTransition.text, W / 2, H * 0.4);
+      ctx.shadowBlur = 0;
       ctx.restore();
     } else {
       waveTransition = null;
@@ -2355,13 +2526,43 @@ function draw() {
     }
   }
 
-  // Active power indicator
+  // Active power indicator + screen-edge glow
   if (activePower && activePower.expiry > 0) {
     const remaining = activePower.expiry - Date.now();
     if (remaining > 0) {
+      const pColor = activePower.type === 'truffle' ? '#ffcc22' : activePower.type === 'mud' ? '#8B4513' : '#00ee88';
+      const pulse = 0.15 + 0.1 * Math.sin(Date.now() / 300);
+
+      // Screen-edge glow (all 4 edges)
+      ctx.save();
+      const edgeW = W * 0.08;
+      // Left
+      let grad = ctx.createLinearGradient(0, 0, edgeW, 0);
+      grad.addColorStop(0, pColor); grad.addColorStop(1, 'transparent');
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, edgeW, H);
+      // Right
+      grad = ctx.createLinearGradient(W, 0, W - edgeW, 0);
+      grad.addColorStop(0, pColor); grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(W - edgeW, 0, edgeW, H);
+      // Top
+      grad = ctx.createLinearGradient(0, 0, 0, edgeW);
+      grad.addColorStop(0, pColor); grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, edgeW);
+      // Bottom
+      grad = ctx.createLinearGradient(0, H, 0, H - edgeW);
+      grad.addColorStop(0, pColor); grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, H - edgeW, W, edgeW);
+      ctx.restore();
+
+      // Text label
       ctx.save();
       ctx.globalAlpha = 0.8;
-      ctx.fillStyle = POWER_COLORS[activePower.type];
+      ctx.fillStyle = pColor;
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(POWER_LABELS[activePower.type] + ' ' + Math.ceil(remaining / 1000) + 's', W / 2, H - 5);

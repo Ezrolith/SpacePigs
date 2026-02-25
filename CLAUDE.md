@@ -18,6 +18,7 @@ A pig-themed Space Invaders game, built as a single-page web app (PWA). Styled t
 - **View:** `"/c/Program Files/GitHub CLI/gh.exe" repo view Ezrolith/SpacePigs`
 
 ### Firebase Hosting & Deployment
+- **Live URL:** https://spacepigs-game.web.app
 - **Firebase Project ID:** `spacepigs-game`
 - **Firebase CI Token:** stored locally (see root CLAUDE.md — not committed to repo)
 - **Node.js:** `C:\Program Files\nodejs`
@@ -79,4 +80,4 @@ SpacePigs/
 - **Starfield background** (seeded, static)
 
 ### Version
-Current version: **v1.4** (shown in screen footer + sw.js cache name)
+Current version: **v1.5** (shown in screen footer + sw.js cache name)
