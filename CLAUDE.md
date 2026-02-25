@@ -30,7 +30,7 @@ A pig-themed Space Invaders game, built as a single-page web app (PWA). Styled t
 - **Working repo:** `D:\Claude Visual Studio\SpacePigs\`
 
 ### Tech Stack
-- **Single file app:** Everything in `index.html` (~2500 lines)
+- **Single file app:** Everything in `index.html` (~3000+ lines)
 - **Vanilla HTML/CSS/JS** — no frameworks, no build step
 - **Firebase Firestore** for leaderboard (per-difficulty)
 - **PWA:** `manifest.json` + `sw.js` for offline/installable support
@@ -43,7 +43,7 @@ SpacePigs/
   firestore.rules        - Firestore security rules (validates name, score, wave, difficulty, ts)
   firestore.indexes.json - Composite index: difficulty + score desc
   icon.svg               - App icon (pig themed)
-  index.html             - THE ENTIRE GAME (~2500 lines: CSS + HTML + JS)
+  index.html             - THE ENTIRE GAME (~3000+ lines: CSS + HTML + JS)
   manifest.json          - PWA manifest
   sw.js                  - Service worker (network-first strategy)
 ```
@@ -52,8 +52,17 @@ SpacePigs/
 - **Phone brand:** "SPACE PIGS" displayed at top of device
 - **Pig ship** (player) with ears-as-antenna, snout cockpit, eye shine — drawn on canvas
 - **3 enemy types:** Wolves (top rows, 30pts, grey with red eyes), Foxes (mid rows, 20pts, orange), Farmers (bottom rows, 10pts, hat + angry eyebrows)
-- **Boss waves** every N waves: cats named **Pepsi** (black cat, green eyes) and **Cherry** (white cat, blue eyes) that alternate — HP bar, spread-shot, slit pupils, whiskers, fangs
-- **Destructible shields** (mud-pile style, 3x3 grid, 3 HP per cell)
+- **4 bosses** cycling every N waves: PEPSI → CHERRY → HARRY → JAKE
+  - **Pepsi** (black cat, lime green eyes) — slit pupils, whiskers, fangs
+  - **Cherry** (white cat, cyan eyes) — same cat style, lighter palette
+  - **Harry** (black cat, orange eyes) — like Pepsi with different eye colour
+  - **Jake** (friendly black dog) — floppy ears, round eyes, tongue out, wagging tail
+- **Boss special attacks** with taunts (text appears before attack):
+  - Cherry: "CLAW!" (diagonal bullet lines + scratch marks), "HISSS!" (mirrored claw), "GOTCHA!" (targeted burst)
+  - Pepsi/Harry: "PURRRR..." (expanding sonic rings with gaps), "NAP TIME..." (sleep cloud), "MEOW!" (circle burst)
+  - Jake: "JUMP!" (paw prints rain down + shockwave), "FETCH!" (bouncy balls off walls), "WOOF!" (bark shockwave arc)
+- **Specials trigger** every 6-9 seconds + at HP thresholds (75%/50%/25%)
+- **Destructible shields** (cyan energy style, 3x3 grid, 3 HP per cell, pulsing glow)
 - **4 power-ups** (10% drop from killed enemies):
   - Truffle Shot: triple spread fire (8s)
   - Mud Shield: absorbs all hits (3s)
@@ -75,9 +84,12 @@ SpacePigs/
 - **Touch controls:** drag on canvas to move + auto-fire, plus button strip (Left/Fire/Right)
 - **Keyboard controls:** Arrow keys / WASD + Space to fire + P to pause
 - **Fullscreen support**
-- **Player bullets:** acorn-shaped projectiles (max 3 on screen)
-- **Enemy bullets:** pitchfork-shaped projectiles
-- **Starfield background** (seeded, static)
+- **Player bullets:** acorn-shaped projectiles with golden glow + trail (max 3 on screen)
+- **Enemy bullets:** pitchfork-shaped with red-orange glow + trail; special types: paw prints (Jake), bouncy balls (Jake), sleep clouds (Pepsi/Harry)
+- **3-layer parallax background:** distant dim stars, drifting nebula clouds (purple/blue/pink), bright twinkling foreground stars (multi-coloured)
+- **Colour-coded flash messages:** per enemy type, per power-up, cyan wave banners, red boss warnings
+- **Death effects:** white+red flash, expanding colour rings on enemy death, boss hit flash
+- **Power-up screen-edge glow:** coloured border glow when timed power active
 
 ### Version
 Current version: **v1.7** (shown in screen footer + sw.js cache name)
