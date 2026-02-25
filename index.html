@@ -512,7 +512,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.12</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.13</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -620,7 +620,8 @@ function summonSuperPig() {
   // Store original size before growing
   const origW = player.w;
   const origH = player.h;
-  superPigMode = { expiry: Date.now() + SUPER_PIG_DURATION, origW: origW, origH: origH };
+  const SUMMON_PIG_DURATION = 8000; // shorter than natural Giant Pig's 15s
+  superPigMode = { expiry: Date.now() + SUMMON_PIG_DURATION, origW: origW, origH: origH };
   // Grow player 5x
   player.w *= 5;
   player.h *= 5;
