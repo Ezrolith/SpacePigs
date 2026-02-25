@@ -1280,11 +1280,11 @@ let deathFlash = 0;
 // Giant Pig bonus event
 let giantPig = null;         // { x, y, w, h, hp, maxHp, vx, vy, spawnTime, maxTime }
 let superPigMode = null;     // { expiry }
-let giantPigTimer = 0;       // timestamp of last spawn check
+let giantPigTimer = Date.now(); // timestamp of last spawn check
 const GIANT_PIG_CHECK_INTERVAL = 15000;
 const GIANT_PIG_CHANCE = 0.08;
 const GIANT_PIG_HP = 8;
-const GIANT_PIG_TIME = 5000;
+const GIANT_PIG_TIME = 7000;
 const SUPER_PIG_DURATION = 15000;
 
 // Input state
@@ -2255,7 +2255,7 @@ function initGame() {
   oinkBombRing = null;
   giantPig = null;
   superPigMode = null;
-  giantPigTimer = 0;
+  giantPigTimer = Date.now();
   deathRings = [];
   bossHitFlash = 0;
   bossTaunt = null;
@@ -2525,12 +2525,17 @@ function update(timestamp) {
     // Bullet collision
     if (giantPig) {
       playerBullets = playerBullets.filter(b => {
+        if (!giantPig) return true; // Already destroyed this frame
         if (rectOverlap(b, giantPig)) {
           giantPig.hp--;
           spawnParticles(b.x + b.w / 2, b.y, '#ffd700', 3);
           if (giantPig.hp <= 0) {
             // Super Pig Mode activated!
             superPigMode = { expiry: Date.now() + SUPER_PIG_DURATION };
+            // Score bonus
+            const gpPoints = 100 * DIFF_SETTINGS[difficulty].scoreMul;
+            score += gpPoints;
+            scoreEl.textContent = score;
             // Gold particle explosion
             for (let i = 0; i < 30; i++) {
               spawnParticles(giantPig.x + giantPig.w / 2, giantPig.y + giantPig.h / 2, '#ffd700', 2);
