@@ -477,7 +477,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.10</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.11</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1276,6 +1276,16 @@ const POWER_LABELS = { truffle: 'TRUFFLE SHOT', mud: 'MUD SHIELD', oink: 'OINK B
 // Wave transition
 let waveTransition = null; // { text, alpha, frame }
 let deathFlash = 0;
+
+// Giant Pig bonus event
+let giantPig = null;         // { x, y, w, h, hp, maxHp, vx, vy, spawnTime, maxTime }
+let superPigMode = null;     // { expiry }
+let giantPigTimer = 0;       // timestamp of last spawn check
+const GIANT_PIG_CHECK_INTERVAL = 15000;
+const GIANT_PIG_CHANCE = 0.08;
+const GIANT_PIG_HP = 8;
+const GIANT_PIG_TIME = 5000;
+const SUPER_PIG_DURATION = 15000;
 
 // Input state
 let keys = { left: false, right: false, fire: false };
@@ -2090,6 +2100,136 @@ function drawPowerUp(pu) {
   ctx.fillText(letter, cx, cy + 1);
 }
 
+// --- Draw Giant Pig ---
+function drawGiantPig(gp) {
+  const cx = gp.x + gp.w / 2;
+  const cy = gp.y + gp.h / 2;
+  const r = gp.w / 2;
+  const now = Date.now();
+  const elapsed = now - gp.spawnTime;
+  const timeLeft = gp.maxTime - elapsed;
+  const timeFrac = Math.max(0, timeLeft / gp.maxTime);
+  const pulse = 1 + 0.03 * Math.sin(now / 100);
+  const urgentFlash = timeLeft < 1500 && Math.sin(now / 80) > 0;
+
+  ctx.save();
+
+  // Glow aura
+  ctx.shadowColor = urgentFlash ? '#ff3333' : '#ffd700';
+  ctx.shadowBlur = 25 + 10 * Math.sin(now / 200);
+
+  // Body (golden circle)
+  ctx.fillStyle = urgentFlash ? '#ff6644' : '#ffd700';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Lighter inner circle
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = urgentFlash ? '#ff9966' : '#ffe44d';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.82 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ears
+  const earW = r * 0.35, earH = r * 0.45;
+  ctx.fillStyle = '#ffcc00';
+  ctx.beginPath();
+  ctx.ellipse(cx - r * 0.55, cy - r * 0.65, earW, earH, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + r * 0.55, cy - r * 0.65, earW, earH, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner ears
+  ctx.fillStyle = '#ffaa66';
+  ctx.beginPath();
+  ctx.ellipse(cx - r * 0.55, cy - r * 0.65, earW * 0.6, earH * 0.6, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + r * 0.55, cy - r * 0.65, earW * 0.6, earH * 0.6, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Snout
+  ctx.fillStyle = '#ffbb55';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + r * 0.15, r * 0.4, r * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Nostrils
+  ctx.fillStyle = '#cc8833';
+  ctx.beginPath();
+  ctx.ellipse(cx - r * 0.12, cy + r * 0.18, r * 0.08, r * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + r * 0.12, cy + r * 0.18, r * 0.08, r * 0.06, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.25, cy - r * 0.15, r * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + r * 0.25, cy - r * 0.15, r * 0.16, 0, Math.PI * 2);
+  ctx.fill();
+  // Pupils
+  ctx.fillStyle = '#222222';
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.25, cy - r * 0.13, r * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + r * 0.25, cy - r * 0.13, r * 0.08, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye shine
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.28, cy - r * 0.18, r * 0.04, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + r * 0.22, cy - r * 0.18, r * 0.04, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crown (3 points on top)
+  ctx.fillStyle = '#ffee00';
+  ctx.shadowColor = '#ffee00';
+  ctx.shadowBlur = 8;
+  const crownY = cy - r * 0.85;
+  const crownW = r * 0.7;
+  ctx.beginPath();
+  ctx.moveTo(cx - crownW, crownY);
+  ctx.lineTo(cx - crownW * 0.6, crownY - r * 0.35);
+  ctx.lineTo(cx - crownW * 0.2, crownY - r * 0.1);
+  ctx.lineTo(cx, crownY - r * 0.45);
+  ctx.lineTo(cx + crownW * 0.2, crownY - r * 0.1);
+  ctx.lineTo(cx + crownW * 0.6, crownY - r * 0.35);
+  ctx.lineTo(cx + crownW, crownY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // HP bar underneath
+  const barW = gp.w * 0.8;
+  const barH = 5;
+  const barX = cx - barW / 2;
+  const barY = gp.y + gp.h + 6;
+  const hpFrac = gp.hp / gp.maxHp;
+  ctx.fillStyle = '#333333';
+  ctx.fillRect(barX, barY, barW, barH);
+  ctx.fillStyle = hpFrac > 0.5 ? '#44ff44' : hpFrac > 0.25 ? '#ffcc00' : '#ff3333';
+  ctx.fillRect(barX, barY, barW * hpFrac, barH);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(barX, barY, barW, barH);
+
+  // Countdown timer ring
+  ctx.strokeStyle = urgentFlash ? '#ff3333' : '#ffd700';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * timeFrac);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 // --- Oink Bomb visual ---
 let oinkBombRing = null;
 
@@ -2113,6 +2253,9 @@ function initGame() {
   boss = null;
   topPigBanner = null;
   oinkBombRing = null;
+  giantPig = null;
+  superPigMode = null;
+  giantPigTimer = 0;
   deathRings = [];
   bossHitFlash = 0;
   bossTaunt = null;
@@ -2255,7 +2398,8 @@ function update(timestamp) {
   player.x = Math.max(0, Math.min(W - player.w, player.x));
 
   // Player fire
-  if (keys.fire && Date.now() - playerFireCooldown >= PLAYER_FIRE_RATE) {
+  const fireRate = superPigMode ? PLAYER_FIRE_RATE / 5 : PLAYER_FIRE_RATE;
+  if (keys.fire && Date.now() - playerFireCooldown >= fireRate) {
     firePlayerBullet();
     playerFireCooldown = Date.now();
   }
@@ -2323,6 +2467,86 @@ function update(timestamp) {
     if (oinkBombRing.alpha <= 0) oinkBombRing = null;
   }
 
+  // Expire Super Pig Mode
+  if (superPigMode && Date.now() > superPigMode.expiry) {
+    superPigMode = null;
+    flashMessages.push({ x: W / 2, y: H * 0.4, text: 'SUPER PIG OVER', color: '#cccccc', alpha: 1.0, frame: 0 });
+  }
+
+  // Giant Pig spawn check
+  if (!giantPig && !superPigMode && !boss && wave >= 3 && Date.now() - giantPigTimer >= GIANT_PIG_CHECK_INTERVAL) {
+    giantPigTimer = Date.now();
+    if (Math.random() < GIANT_PIG_CHANCE) {
+      const gpSize = W * 0.15;
+      giantPig = {
+        x: W * 0.2 + Math.random() * W * 0.6,
+        y: H * 0.1 + Math.random() * H * 0.3,
+        w: gpSize, h: gpSize,
+        hp: GIANT_PIG_HP, maxHp: GIANT_PIG_HP,
+        vx: (2 + Math.random() * 2) * (Math.random() < 0.5 ? 1 : -1),
+        vy: (1.5 + Math.random() * 2) * (Math.random() < 0.5 ? 1 : -1),
+        spawnTime: Date.now(),
+        maxTime: GIANT_PIG_TIME,
+      };
+      playBossAppear();
+      flashMessages.push({ x: W / 2, y: H * 0.3, text: 'SUPER PIG INCOMING!', color: '#ffd700', alpha: 1.0, frame: 0 });
+    }
+  }
+
+  // Giant Pig update
+  if (giantPig) {
+    // Bouncing movement
+    giantPig.x += giantPig.vx;
+    giantPig.y += giantPig.vy;
+
+    // Bounce off edges with random perturbation
+    if (giantPig.x <= 0 || giantPig.x + giantPig.w >= W) {
+      giantPig.vx *= -1;
+      giantPig.vy += (Math.random() - 0.5) * 1.5;
+      giantPig.x = Math.max(0, Math.min(W - giantPig.w, giantPig.x));
+    }
+    if (giantPig.y <= 0 || giantPig.y + giantPig.h >= H * 0.75) {
+      giantPig.vy *= -1;
+      giantPig.vx += (Math.random() - 0.5) * 1.5;
+      giantPig.y = Math.max(0, Math.min(H * 0.75 - giantPig.h, giantPig.y));
+    }
+
+    // Clamp velocity
+    const maxV = 5;
+    giantPig.vx = Math.max(-maxV, Math.min(maxV, giantPig.vx));
+    giantPig.vy = Math.max(-maxV, Math.min(maxV, giantPig.vy));
+
+    // Time check — escaped
+    if (Date.now() - giantPig.spawnTime > giantPig.maxTime) {
+      flashMessages.push({ x: giantPig.x + giantPig.w / 2, y: giantPig.y, text: 'ESCAPED!', color: '#888888', alpha: 1.0, frame: 0 });
+      giantPig = null;
+    }
+
+    // Bullet collision
+    if (giantPig) {
+      playerBullets = playerBullets.filter(b => {
+        if (rectOverlap(b, giantPig)) {
+          giantPig.hp--;
+          spawnParticles(b.x + b.w / 2, b.y, '#ffd700', 3);
+          if (giantPig.hp <= 0) {
+            // Super Pig Mode activated!
+            superPigMode = { expiry: Date.now() + SUPER_PIG_DURATION };
+            // Gold particle explosion
+            for (let i = 0; i < 30; i++) {
+              spawnParticles(giantPig.x + giantPig.w / 2, giantPig.y + giantPig.h / 2, '#ffd700', 2);
+            }
+            spawnParticles(giantPig.x + giantPig.w / 2, giantPig.y + giantPig.h / 2, '#ffaa00', 15);
+            flashMessages.push({ x: W / 2, y: H * 0.35, text: 'SUPER PIG MODE!', color: '#ffd700', alpha: 1.0, frame: 0 });
+            playWaveComplete();
+            giantPig = null;
+          }
+          return false;
+        }
+        return true;
+      });
+    }
+  }
+
   if (boss) {
     updateBoss(dt);
   } else {
@@ -2348,13 +2572,14 @@ function update(timestamp) {
 }
 
 function firePlayerBullet() {
-  if (playerBullets.length >= 3) return;
+  const maxBullets = superPigMode ? 15 : 3;
+  if (playerBullets.length >= maxBullets) return;
   playPew();
   const bw = 4;
   const bh = 8;
   const cx = player.x + player.w / 2;
 
-  if (activePower && activePower.type === 'truffle') {
+  if (superPigMode || (activePower && activePower.type === 'truffle')) {
     // Triple spread
     playerBullets.push({ x: cx - bw / 2, y: player.y - bh, w: bw, h: bh, speed: PLAYER_BULLET_SPEED, vx: 0 });
     playerBullets.push({ x: cx - bw / 2 - 6, y: player.y - bh, w: bw, h: bh, speed: PLAYER_BULLET_SPEED, vx: -1.5 });
@@ -2790,6 +3015,11 @@ function collisionDetection() {
 
     // vs player
     if (rectOverlap(b, player)) {
+      if (superPigMode) {
+        // Super Pig Mode absorbs hit
+        spawnParticles(b.x, b.y, '#ffd700', 5);
+        return false;
+      }
       if (activePower && activePower.type === 'mud') {
         // Mud shield absorbs hit
         spawnParticles(b.x, b.y, '#8B4513', 4);
@@ -2983,6 +3213,9 @@ function draw() {
   // Boss
   if (boss) drawBoss(boss);
 
+  // Giant Pig
+  if (giantPig) drawGiantPig(giantPig);
+
   // Boss claw marks (Cherry)
   bossClawMarks.forEach(m => {
     ctx.save();
@@ -3037,6 +3270,26 @@ function draw() {
   }
 
   // Player
+  if (superPigMode) {
+    // Golden aura around player
+    ctx.save();
+    const px = player.x + player.w / 2;
+    const py = player.y + player.h / 2;
+    const auraR = player.w * 0.9;
+    const auraGrad = ctx.createRadialGradient(px, py, player.w * 0.3, px, py, auraR);
+    auraGrad.addColorStop(0, 'rgba(255,215,0,0.3)');
+    auraGrad.addColorStop(0.6, 'rgba(255,170,0,0.15)');
+    auraGrad.addColorStop(1, 'rgba(255,215,0,0)');
+    ctx.fillStyle = auraGrad;
+    ctx.beginPath();
+    ctx.arc(px, py, auraR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Gold particle trail
+    if (Math.random() < 0.4) {
+      spawnParticles(player.x + Math.random() * player.w, player.y + player.h * 0.8, '#ffd700', 1);
+    }
+  }
   drawPigShip(player.x, player.y, player.w, player.h);
 
   // Player bullets (acorns)
@@ -3233,6 +3486,47 @@ function draw() {
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.fillText(POWER_LABELS[activePower.type] + ' ' + Math.ceil(remaining / 1000) + 's', W / 2, H - 5);
+      ctx.restore();
+    }
+  }
+
+  // Super Pig Mode screen-edge glow + timer
+  if (superPigMode) {
+    const remaining = superPigMode.expiry - Date.now();
+    if (remaining > 0) {
+      const pulse = 0.25 + 0.15 * Math.sin(Date.now() / 200);
+
+      // Bright golden screen-edge glow (all 4 edges)
+      ctx.save();
+      const edgeW = W * 0.12;
+      let grad = ctx.createLinearGradient(0, 0, edgeW, 0);
+      grad.addColorStop(0, '#ffd700'); grad.addColorStop(1, 'transparent');
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, edgeW, H);
+      grad = ctx.createLinearGradient(W, 0, W - edgeW, 0);
+      grad.addColorStop(0, '#ffd700'); grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(W - edgeW, 0, edgeW, H);
+      grad = ctx.createLinearGradient(0, 0, 0, edgeW);
+      grad.addColorStop(0, '#ffd700'); grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, edgeW);
+      grad = ctx.createLinearGradient(0, H, 0, H - edgeW);
+      grad.addColorStop(0, '#ffd700'); grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, H - edgeW, W, edgeW);
+      ctx.restore();
+
+      // Timer text
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#ffd700';
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 10;
+      ctx.font = 'bold 11px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SUPER PIG: ' + Math.ceil(remaining / 1000) + 's', W / 2, H - 5);
       ctx.restore();
     }
   }
