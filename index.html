@@ -510,7 +510,11 @@
           <div class="shop-title">UPGRADES</div>
           <div class="shop-row">
             <span class="shop-label">+1 Life</span>
-            <span class="shop-pips"><span id="elPip1" style="opacity:0.3">&#x2764;&#xFE0F;</span></span>
+            <span class="shop-pips">
+              <span id="elPip1" style="opacity:0.3">&#x2764;&#xFE0F;</span>
+              <span id="elPip2" style="opacity:0.3">&#x2764;&#xFE0F;</span>
+              <span id="elPip3" style="opacity:0.3">&#x2764;&#xFE0F;</span>
+            </span>
             <button class="shop-buy-btn" id="shopExtraLife">&#x1FA99;250</button>
           </div>
           <div class="shop-row">
@@ -560,7 +564,7 @@
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
       <span class="upgrade-indicators" id="upgradeIndicators"></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.16</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.17</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -718,7 +722,7 @@ function updateCreditsDisplay() {
 
 function purchaseUpgrade(type) {
   const costs = { extraLife: 250, attackSpeed: 250 };
-  const maxLevels = { extraLife: 1, attackSpeed: 3 };
+  const maxLevels = { extraLife: 3, attackSpeed: 3 };
   if (userUpgrades[type] >= maxLevels[type]) return;
   if (userCredits < costs[type]) return;
   spendCredits(costs[type]);
@@ -737,7 +741,7 @@ function updateUpgradesDisplay() {
   const el = document.getElementById('upgradeIndicators');
   if (!el) return;
   let txt = '';
-  if (userUpgrades.extraLife) txt += '+1\u2764\ufe0f ';
+  if (userUpgrades.extraLife) txt += '+' + userUpgrades.extraLife + '\u2764\ufe0f ';
   if (userUpgrades.attackSpeed) txt += '\u26a1x' + userUpgrades.attackSpeed;
   el.textContent = txt;
 }
@@ -746,15 +750,17 @@ function updateShopUI() {
   const elBtn = document.getElementById('shopExtraLife');
   const asBtn = document.getElementById('shopAttackSpeed');
   if (elBtn) {
-    if (userUpgrades.extraLife >= 1) { elBtn.textContent = 'OWNED'; elBtn.disabled = true; }
-    else { elBtn.disabled = userCredits < 250; }
+    if (userUpgrades.extraLife >= 3) { elBtn.textContent = 'MAXED'; elBtn.disabled = true; }
+    else { elBtn.textContent = '\u{1FA99}250'; elBtn.disabled = userCredits < 250; }
   }
   if (asBtn) {
     if (userUpgrades.attackSpeed >= 3) { asBtn.textContent = 'MAXED'; asBtn.disabled = true; }
     else { asBtn.textContent = '\u{1FA99}250'; asBtn.disabled = userCredits < 250; }
   }
-  const elPip = document.getElementById('elPip1');
-  if (elPip) elPip.style.opacity = userUpgrades.extraLife ? '1' : '0.3';
+  for (let i = 1; i <= 3; i++) {
+    const elPip = document.getElementById('elPip' + i);
+    if (elPip) elPip.style.opacity = i <= userUpgrades.extraLife ? '1' : '0.3';
+  }
   for (let i = 1; i <= 3; i++) {
     const pip = document.getElementById('asPip' + i);
     if (pip) pip.style.opacity = i <= userUpgrades.attackSpeed ? '1' : '0.3';
@@ -2438,7 +2444,7 @@ function initGame() {
   const ds = DIFF_SETTINGS[difficulty];
   score = 0;
   lives = ds.lives;
-  if (userUpgrades.extraLife) lives += 1;
+  if (userUpgrades.extraLife) lives += userUpgrades.extraLife;
   wave = 1;
   superPigUsedThisRound = false;
   scoreEl.textContent = 0;
