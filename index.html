@@ -437,6 +437,36 @@
     opacity: 0.6;
   }
 
+  .shop-section {
+    margin-top: 8px; padding: 6px 10px; width: 85%;
+    background: rgba(139, 58, 85, 0.12);
+    border-radius: 8px; border: 1px solid rgba(139, 58, 85, 0.2);
+  }
+  .shop-title {
+    color: #ffd700; font-size: 11px; font-weight: bold;
+    text-align: center; letter-spacing: 2px; margin-bottom: 4px;
+  }
+  .shop-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 3px 0; font-size: 10px;
+  }
+  .shop-label { color: #c0c0e0; font-weight: bold; width: 65px; }
+  .shop-pips { flex: 1; text-align: center; font-size: 11px; }
+  .shop-buy-btn {
+    background: linear-gradient(180deg, #ffd700, #ffaa00);
+    border: 1.5px solid #cc8800; border-radius: 6px;
+    color: #4a2800; font-family: 'Courier New', monospace;
+    font-size: 9px; font-weight: bold; padding: 3px 8px;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .shop-buy-btn:disabled {
+    background: linear-gradient(180deg, #888, #666);
+    border-color: #555; color: #aaa; cursor: default; opacity: 0.6;
+  }
+  .upgrade-indicators {
+    color: #ffd700; font-size: 9px; opacity: 0.8; letter-spacing: 0;
+  }
+
   @media (max-height: 600px) {
     .phone { padding: 10px 10px 14px; border-radius: 16px; }
     .phone-brand { font-size: 12px; margin-bottom: 4px; }
@@ -467,8 +497,8 @@
       <div class="overlay" id="startOverlay">
         <div class="overlay-pig">&#x1F43D;</div>
         <div class="overlay-title">SPACE PIGS</div>
-        <div class="overlay-text">Defend the farm from</div>
-        <div class="overlay-text">the wolves above!</div>
+        <div class="overlay-text">It's raining cats & dogs</div>
+        <div class="overlay-text">(and wolves and farmers)!</div>
         <div style="margin-top:8px">
           <button class="play-again-btn" id="startBtn">LAUNCH!</button>
         </div>
@@ -476,6 +506,23 @@
           <div class="champs-loading" id="champsLoading">Loading champs...</div>
         </div>
         <div id="creditsDisplay" style="color:#ffd700;font-size:11px;margin-top:6px;text-align:center;letter-spacing:1px">&#x1FA99; 0 CREDITS</div>
+        <div class="shop-section" id="shopSection">
+          <div class="shop-title">UPGRADES</div>
+          <div class="shop-row">
+            <span class="shop-label">+1 Life</span>
+            <span class="shop-pips"><span id="elPip1" style="opacity:0.3">&#x2764;&#xFE0F;</span></span>
+            <button class="shop-buy-btn" id="shopExtraLife">&#x1FA99;250</button>
+          </div>
+          <div class="shop-row">
+            <span class="shop-label">&#x26A1; Speed</span>
+            <span class="shop-pips">
+              <span id="asPip1" style="opacity:0.3">&#x26A1;</span>
+              <span id="asPip2" style="opacity:0.3">&#x26A1;</span>
+              <span id="asPip3" style="opacity:0.3">&#x26A1;</span>
+            </span>
+            <button class="shop-buy-btn" id="shopAttackSpeed">&#x1FA99;250</button>
+          </div>
+        </div>
       </div>
       <div class="overlay hidden" id="gameOverOverlay">
         <div class="overlay-pig">&#x1F634;</div>
@@ -512,7 +559,8 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.13</span>
+      <span class="upgrade-indicators" id="upgradeIndicators"></span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.14</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -565,6 +613,8 @@ try {
 // --- Anonymous Auth + Credits ---
 let currentUser = null;
 let userCredits = 0;
+let userUpgrades = { extraLife: 0, attackSpeed: 0 };
+let superPigUsedThisRound = false;
 try {
   firebase.auth().signInAnonymously().catch(e => console.warn('Auth:', e));
   firebase.auth().onAuthStateChanged(user => {
@@ -577,8 +627,16 @@ async function loadUserCredits(uid) {
   if (!db) return;
   try {
     const doc = await db.collection('users').doc(uid).get();
-    if (doc.exists) userCredits = doc.data().credits || 0;
+    if (doc.exists) {
+      const data = doc.data();
+      userCredits = data.credits || 0;
+      if (data.upgrades) {
+        userUpgrades = { extraLife: data.upgrades.extraLife || 0, attackSpeed: data.upgrades.attackSpeed || 0 };
+      }
+    }
     updateCreditsDisplay();
+    updateUpgradesDisplay();
+    updateShopUI();
   } catch(e) { console.warn('Credits load:', e); }
 }
 
@@ -612,15 +670,20 @@ async function spendCredits(amount) {
 
 function summonSuperPig() {
   if (state !== 'playing' || superPigMode) return;
+  if (superPigUsedThisRound) return;
   if (userCredits < 100) {
     flashMessages.push({ x: W / 2, y: H * 0.5, text: 'NOT ENOUGH CREDITS', color: '#ff4444', alpha: 1.0, frame: 0 });
     return;
   }
   spendCredits(100);
+  superPigUsedThisRound = true;
   // Store original size before growing
   const origW = player.w;
   const origH = player.h;
-  const SUMMON_PIG_DURATION = 8000; // shorter than natural Giant Pig's 15s
+  // Duration scales down by wave: 8s at waves 1-5, -1s per 5 waves, min 4s
+  const baseDuration = 8000;
+  const reduction = Math.floor((wave - 1) / 5) * 1000;
+  const SUMMON_PIG_DURATION = Math.max(4000, baseDuration - reduction);
   superPigMode = { expiry: Date.now() + SUMMON_PIG_DURATION, origW: origW, origH: origH };
   // Grow player 5x
   player.w *= 5;
@@ -637,12 +700,65 @@ function summonSuperPig() {
 
 function updateSuperPigBtn() {
   const btn = document.getElementById('btnSuperPig');
-  if (btn) btn.disabled = (userCredits < 100 || !!superPigMode || state !== 'playing');
+  if (!btn) return;
+  if (superPigUsedThisRound) {
+    btn.disabled = true;
+    btn.textContent = 'USED';
+  } else {
+    btn.disabled = (userCredits < 100 || !!superPigMode || state !== 'playing');
+    btn.textContent = 'SUPER PIG \u{1FA99}100';
+  }
 }
 
 function updateCreditsDisplay() {
   const el = document.getElementById('creditsDisplay');
   if (el) el.textContent = '\u{1FA99} ' + userCredits + ' CREDITS';
+  updateShopUI();
+}
+
+function purchaseUpgrade(type) {
+  const costs = { extraLife: 250, attackSpeed: 250 };
+  const maxLevels = { extraLife: 1, attackSpeed: 3 };
+  if (userUpgrades[type] >= maxLevels[type]) return;
+  if (userCredits < costs[type]) return;
+  spendCredits(costs[type]);
+  userUpgrades[type]++;
+  if (db && currentUser) {
+    db.collection('users').doc(currentUser.uid).set({
+      upgrades: userUpgrades,
+      lastPlayed: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true }).catch(e => console.warn('Upgrade save:', e));
+  }
+  updateUpgradesDisplay();
+  updateShopUI();
+}
+
+function updateUpgradesDisplay() {
+  const el = document.getElementById('upgradeIndicators');
+  if (!el) return;
+  let txt = '';
+  if (userUpgrades.extraLife) txt += '+1\u2764\ufe0f ';
+  if (userUpgrades.attackSpeed) txt += '\u26a1x' + userUpgrades.attackSpeed;
+  el.textContent = txt;
+}
+
+function updateShopUI() {
+  const elBtn = document.getElementById('shopExtraLife');
+  const asBtn = document.getElementById('shopAttackSpeed');
+  if (elBtn) {
+    if (userUpgrades.extraLife >= 1) { elBtn.textContent = 'OWNED'; elBtn.disabled = true; }
+    else { elBtn.disabled = userCredits < 250; }
+  }
+  if (asBtn) {
+    if (userUpgrades.attackSpeed >= 3) { asBtn.textContent = 'MAXED'; asBtn.disabled = true; }
+    else { asBtn.textContent = '\u{1FA99}250'; asBtn.disabled = userCredits < 250; }
+  }
+  const elPip = document.getElementById('elPip1');
+  if (elPip) elPip.style.opacity = userUpgrades.extraLife ? '1' : '0.3';
+  for (let i = 1; i <= 3; i++) {
+    const pip = document.getElementById('asPip' + i);
+    if (pip) pip.style.opacity = i <= userUpgrades.attackSpeed ? '1' : '0.3';
+  }
 }
 
 function escapeHtml(s) {
@@ -2320,7 +2436,9 @@ function initGame() {
   const ds = DIFF_SETTINGS[difficulty];
   score = 0;
   lives = ds.lives;
+  if (userUpgrades.extraLife) lives += 1;
   wave = 1;
+  superPigUsedThisRound = false;
   scoreEl.textContent = 0;
   livesLabel.textContent = lives;
   waveLabel.textContent = 1;
@@ -2480,7 +2598,8 @@ function update(timestamp) {
   player.x = Math.max(0, Math.min(W - player.w, player.x));
 
   // Player fire
-  const fireRate = superPigMode ? PLAYER_FIRE_RATE / 5 : PLAYER_FIRE_RATE;
+  let fireRate = superPigMode ? PLAYER_FIRE_RATE / 5 : PLAYER_FIRE_RATE;
+  if (userUpgrades.attackSpeed > 0) fireRate *= (1 - userUpgrades.attackSpeed * 0.1);
   if (keys.fire && Date.now() - playerFireCooldown >= fireRate) {
     firePlayerBullet();
     playerFireCooldown = Date.now();
@@ -3702,6 +3821,10 @@ const btnSuperPig = document.getElementById('btnSuperPig');
 let superPigTouched = false;
 btnSuperPig.addEventListener('touchstart', e => { e.preventDefault(); superPigTouched = true; summonSuperPig(); }, { passive: false });
 btnSuperPig.addEventListener('click', e => { e.preventDefault(); if (!superPigTouched) summonSuperPig(); superPigTouched = false; });
+
+// Shop buttons
+document.getElementById('shopExtraLife').addEventListener('click', () => purchaseUpgrade('extraLife'));
+document.getElementById('shopAttackSpeed').addEventListener('click', () => purchaseUpgrade('attackSpeed'));
 
 // --- Canvas touch-drag controls (mobile) ---
 // Touch/drag on canvas moves pig to finger position + auto-fires
