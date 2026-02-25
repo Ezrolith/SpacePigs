@@ -1,4 +1,4 @@
-const CACHE_NAME = 'spacepigs-v1.5';
+const CACHE_NAME = 'spacepigs-v1.6';
 const ASSETS = [
   './',
   './index.html',

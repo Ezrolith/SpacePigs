@@ -466,7 +466,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.5</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.6</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1195,6 +1195,11 @@ let boss = null;
 let bossDir = 1;
 let bossHitFlash = 0;
 
+// Boss special attack visuals
+let bossTaunt = null;       // { text, color, frame, maxFrames }
+let bossClawMarks = [];     // { x1,y1,x2,y2,alpha,color }
+let bossSonicRings = [];    // { x,y,radius,speed,alpha,gapAngle,gapSize,color }
+
 // Power-ups
 let powerUps = [];
 let activePower = null; // { type, expiry }
@@ -1857,6 +1862,9 @@ function initGame() {
   oinkBombRing = null;
   deathRings = [];
   bossHitFlash = 0;
+  bossTaunt = null;
+  bossClawMarks = [];
+  bossSonicRings = [];
   updateTarget();
   setupPlayer();
   setupWave();
@@ -1903,6 +1911,12 @@ function setupWave() {
       lastShot: 0,
       shotInterval: Math.max(400, 1200 - wave * 40),
       catName,
+      // Special attack system
+      specialTimer: Date.now() + 4000,
+      specialPhase: null,   // null | 'taunt' | 'attack'
+      specialStart: 0,
+      specialType: null,    // 'claw'|'hiss'|'gotcha'|'purr'|'naptime'|'meow'
+      lastSpecialHp: 15 + wave * 3,
     };
     bossDir = 1;
     playBossAppear();
@@ -2000,9 +2014,32 @@ function update(timestamp) {
 
   // Update enemy bullets
   enemyBullets = enemyBullets.filter(b => {
-    b.y += b.speed;
-    return b.y < H;
+    if (b.vy !== undefined) {
+      b.y += b.vy;
+    } else {
+      b.y += b.speed;
+    }
+    return b.y < H + 10 && b.y > -10 && b.x > -20 && b.x < W + 20;
   });
+
+  // Update sonic rings (Pepsi's PURR attack)
+  bossSonicRings = bossSonicRings.filter(r => {
+    r.radius += r.speed;
+    r.alpha *= 0.985;
+    return r.alpha > 0.05 && r.radius < H;
+  });
+
+  // Update claw marks (Cherry's CLAW visual)
+  bossClawMarks = bossClawMarks.filter(m => {
+    m.alpha -= 0.015;
+    return m.alpha > 0;
+  });
+
+  // Update boss taunt text
+  if (bossTaunt) {
+    bossTaunt.frame++;
+    if (bossTaunt.frame >= bossTaunt.maxFrames) bossTaunt = null;
+  }
 
   // Update power-ups (falling)
   powerUps = powerUps.filter(pu => {
@@ -2126,23 +2163,202 @@ function updateEnemies(dt) {
   });
 }
 
+function pickSpecialAttack(catName) {
+  if (catName === 'CHERRY') {
+    const attacks = ['claw', 'hiss', 'gotcha'];
+    return attacks[Math.floor(Math.random() * attacks.length)];
+  } else {
+    const attacks = ['purr', 'naptime', 'meow'];
+    return attacks[Math.floor(Math.random() * attacks.length)];
+  }
+}
+
+function getTauntText(type) {
+  const taunts = {
+    claw: 'CLAW!', hiss: 'HISSS!', gotcha: 'GOTCHA!',
+    purr: 'PURRRR...', naptime: 'NAP TIME...', meow: 'MEOW!',
+  };
+  return taunts[type] || '...';
+}
+
+function getTauntColor(catName) {
+  return catName === 'PEPSI' ? '#ccff44' : '#66ddff';
+}
+
+function fireSpecialAttack() {
+  if (!boss) return;
+  const cx = boss.x + boss.w / 2;
+  const by = boss.y + boss.h;
+  const type = boss.specialType;
+  const color = getTauntColor(boss.catName);
+
+  if (type === 'claw') {
+    // 3 diagonal claw lines of 4 bullets each, angled left-to-right
+    const angles = [-0.5, 0, 0.5];
+    angles.forEach((ang, li) => {
+      for (let i = 0; i < 4; i++) {
+        const delay = i * 0.12;
+        const spd = 5;
+        enemyBullets.push({
+          x: cx + ang * 30 - 1, y: by + i * 6,
+          w: 3, h: 8, speed: spd,
+          vx: ang * 3,
+        });
+      }
+      // Claw mark visual
+      bossClawMarks.push({
+        x1: cx + ang * 20, y1: by,
+        x2: cx + ang * 80, y2: by + H * 0.5,
+        alpha: 0.8, color,
+      });
+    });
+    playBossAppear();
+
+  } else if (type === 'hiss') {
+    // Same claw pattern but mirrored (from right to left)
+    const angles = [0.5, 0, -0.5];
+    angles.forEach((ang, li) => {
+      for (let i = 0; i < 4; i++) {
+        enemyBullets.push({
+          x: cx - ang * 30 - 1, y: by + i * 6,
+          w: 3, h: 8, speed: 5,
+          vx: -ang * 3,
+        });
+      }
+      bossClawMarks.push({
+        x1: cx - ang * 20, y1: by,
+        x2: cx - ang * 80, y2: by + H * 0.5,
+        alpha: 0.8, color,
+      });
+    });
+    playBossAppear();
+
+  } else if (type === 'gotcha') {
+    // Targeted burst — 6 bullets aimed directly at player
+    const px = player.x + player.w / 2;
+    const py = player.y + player.h / 2;
+    const baseAngle = Math.atan2(py - by, px - cx);
+    for (let i = 0; i < 6; i++) {
+      const a = baseAngle + (i - 2.5) * 0.12;
+      enemyBullets.push({
+        x: cx - 1, y: by,
+        w: 3, h: 8, speed: 5.5,
+        vx: Math.cos(a) * 5.5,
+        vy: Math.sin(a) * 5.5,
+        targeted: true,
+      });
+    }
+    playBossAppear();
+
+  } else if (type === 'purr') {
+    // 3 expanding sonic rings with gaps, staggered
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => {
+        if (!boss) return;
+        const gapAngle = Math.random() * Math.PI * 2;
+        bossSonicRings.push({
+          x: boss.x + boss.w / 2, y: boss.y + boss.h / 2,
+          radius: 10, speed: 2.5,
+          alpha: 0.7, gapAngle, gapSize: 0.8,
+          color: '#ccff44',
+        });
+      }, i * 350);
+    }
+    playBossAppear();
+
+  } else if (type === 'naptime') {
+    // Slow-drifting "sleep cloud" — cluster of bullets that drift down slowly and spread
+    for (let i = 0; i < 10; i++) {
+      const angle = (Math.PI * 2 / 10) * i;
+      enemyBullets.push({
+        x: cx + Math.cos(angle) * 15 - 1, y: by,
+        w: 4, h: 4, speed: 1.5,
+        vx: Math.cos(angle) * 0.8,
+        sleepy: true,
+      });
+    }
+    playBossAppear();
+
+  } else if (type === 'meow') {
+    // Rapid circle burst — 10 bullets in a ring
+    for (let i = 0; i < 10; i++) {
+      const angle = (Math.PI * 2 / 10) * i;
+      enemyBullets.push({
+        x: cx - 1, y: by,
+        w: 3, h: 8, speed: 4,
+        vx: Math.cos(angle) * 3.5,
+        vy: Math.sin(angle) * 4,
+      });
+    }
+    playBossAppear();
+  }
+}
+
 function updateBoss(dt) {
   if (!boss) return;
+  const now = Date.now();
 
+  // --- Special attack state machine ---
+  // Check triggers: timer elapsed OR HP crossed a 25% threshold
+  if (!boss.specialPhase) {
+    const hpThreshold = Math.floor(boss.hp / (boss.maxHp * 0.25));
+    const lastThreshold = Math.floor(boss.lastSpecialHp / (boss.maxHp * 0.25));
+    const hpTriggered = hpThreshold < lastThreshold && boss.hp > 0;
+    if (hpTriggered) boss.lastSpecialHp = boss.hp;
+
+    if (now >= boss.specialTimer || hpTriggered) {
+      // Enter taunt phase
+      boss.specialPhase = 'taunt';
+      boss.specialStart = now;
+      boss.specialType = pickSpecialAttack(boss.catName);
+      const color = getTauntColor(boss.catName);
+      bossTaunt = { text: getTauntText(boss.specialType), color, frame: 0, maxFrames: 72 };
+    }
+  }
+
+  if (boss.specialPhase === 'taunt') {
+    // Slow movement, no shooting, wait 1.2s
+    boss.x += boss.speed * 0.3 * bossDir;
+    if (boss.x + boss.w > W - 5) bossDir = -1;
+    if (boss.x < 5) bossDir = 1;
+
+    if (now - boss.specialStart >= 1200) {
+      // Fire the special attack
+      boss.specialPhase = 'attack';
+      boss.specialStart = now;
+      fireSpecialAttack();
+    }
+    return; // Skip normal shooting during taunt
+  }
+
+  if (boss.specialPhase === 'attack') {
+    // Brief attack phase — slow movement for 0.6s then resume
+    boss.x += boss.speed * 0.5 * bossDir;
+    if (boss.x + boss.w > W - 5) bossDir = -1;
+    if (boss.x < 5) bossDir = 1;
+
+    if (now - boss.specialStart >= 600) {
+      boss.specialPhase = null;
+      boss.specialTimer = now + 6000 + Math.random() * 3000; // 6-9s until next
+    }
+    return; // Skip normal shooting during attack
+  }
+
+  // --- Normal phase ---
   // Move horizontally
   boss.x += boss.speed * bossDir;
   if (boss.x + boss.w > W - 5) bossDir = -1;
   if (boss.x < 5) bossDir = 1;
 
   // Boss shooting
-  if (Date.now() - boss.lastShot >= boss.shotInterval) {
+  if (now - boss.lastShot >= boss.shotInterval) {
     const cx = boss.x + boss.w / 2;
     const by = boss.y + boss.h;
     // Fire 3 bullets in a spread
     enemyBullets.push({ x: cx - 1, y: by, w: 3, h: 10, speed: 3.5 });
     enemyBullets.push({ x: cx - 10, y: by, w: 3, h: 10, speed: 3.5, vx: -1 });
     enemyBullets.push({ x: cx + 10, y: by, w: 3, h: 10, speed: 3.5, vx: 1 });
-    boss.lastShot = Date.now();
+    boss.lastShot = now;
   }
 }
 
@@ -2421,6 +2637,59 @@ function draw() {
   // Boss
   if (boss) drawBoss(boss);
 
+  // Boss claw marks (Cherry)
+  bossClawMarks.forEach(m => {
+    ctx.save();
+    ctx.globalAlpha = m.alpha;
+    ctx.strokeStyle = m.color;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = m.color;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.moveTo(m.x1, m.y1);
+    ctx.lineTo(m.x2, m.y2);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // Boss sonic rings (Pepsi)
+  bossSonicRings.forEach(r => {
+    ctx.save();
+    ctx.globalAlpha = r.alpha;
+    ctx.strokeStyle = r.color;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = r.color;
+    ctx.shadowBlur = 10;
+    // Draw arc with gap
+    const gapHalf = r.gapSize / 2;
+    ctx.beginPath();
+    ctx.arc(r.x, r.y, r.radius, r.gapAngle + gapHalf, r.gapAngle + Math.PI * 2 - gapHalf);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  // Boss taunt text
+  if (bossTaunt) {
+    const tf = bossTaunt.frame;
+    const tmf = bossTaunt.maxFrames;
+    let ta = 1;
+    if (tf < 8) ta = tf / 8;
+    else if (tf > tmf - 15) ta = (tmf - tf) / 15;
+    ctx.save();
+    ctx.globalAlpha = ta;
+    ctx.fillStyle = bossTaunt.color;
+    ctx.shadowColor = bossTaunt.color;
+    ctx.shadowBlur = 20;
+    const tSize = Math.min(W * 0.08, 32);
+    ctx.font = `bold ${tSize}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const bossY = boss ? boss.y + boss.h + 30 : H * 0.25;
+    const bob = Math.sin(tf * 0.15) * 3;
+    ctx.fillText(bossTaunt.text, W / 2, bossY + bob + tSize);
+    ctx.restore();
+  }
+
   // Player
   drawPigShip(player.x, player.y, player.w, player.h);
 
@@ -2429,9 +2698,26 @@ function draw() {
     drawAcornBullet(b.x + b.w / 2, b.y + b.h / 2, b.w);
   });
 
-  // Enemy bullets (pitchforks)
+  // Enemy bullets (pitchforks / special)
   enemyBullets.forEach(b => {
-    drawPitchforkBullet(b.x + b.w / 2, b.y, b.h);
+    if (b.sleepy) {
+      // Sleepy cloud puff
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#8866cc';
+      ctx.shadowColor = '#8866cc';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(b.x + b.w / 2, b.y + b.h / 2, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.3;
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('z', b.x + b.w / 2 + 4, b.y);
+      ctx.restore();
+    } else {
+      drawPitchforkBullet(b.x + b.w / 2, b.y, b.h);
+    }
   });
 
   // Power-ups
