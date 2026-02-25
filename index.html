@@ -466,7 +466,7 @@
     </div>
     <div class="screen-footer">
       <span class="lives-display">Lives: <span id="livesLabel">3</span></span>
-      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.6</span>
+      <span style="font-size:9px;opacity:0.4;letter-spacing:0">v1.7</span>
       <span>Wave: <span id="waveLabel">1</span></span>
     </div>
   </div>
@@ -1649,11 +1649,19 @@ function drawShield(shield) {
   }
 }
 
+// Boss colour/style lookup
+const BOSS_STYLES = {
+  PEPSI:  { furMain: '#1a1a2a', furDark: '#0a0a18', innerEar: '#3a2040', nose: '#333', eyeColor: '#ccff44', mouth: '#555', whiskers: '#555', type: 'cat' },
+  CHERRY: { furMain: '#f0ede8', furDark: '#d8d4cc', innerEar: '#f0b0b8', nose: '#f0a0a8', eyeColor: '#66ddff', mouth: '#bba0a0', whiskers: '#ccc', type: 'cat' },
+  HARRY:  { furMain: '#1a1a2a', furDark: '#0a0a18', innerEar: '#3a2040', nose: '#333', eyeColor: '#ff8844', mouth: '#555', whiskers: '#555', type: 'cat' },
+  JAKE:   { furMain: '#222222', furDark: '#111111', innerEar: '#553333', nose: '#222', eyeColor: '#ffaa44', mouth: '#444', type: 'dog' },
+};
+
 function drawBoss(b) {
   const cx = b.x + b.w / 2;
   const cy = b.y + b.h / 2;
   const s = b.w / 40;
-  const isPepsi = b.catName === 'PEPSI';
+  const style = BOSS_STYLES[b.catName] || BOSS_STYLES.PEPSI;
 
   // Hit flash — white overlay
   if (bossHitFlash > 0) {
@@ -1667,129 +1675,22 @@ function drawBoss(b) {
     bossHitFlash--;
   }
 
-  // Colors based on cat
-  const furMain = isPepsi ? '#1a1a2a' : '#f0ede8';
-  const furDark = isPepsi ? '#0a0a18' : '#d8d4cc';
-  const furLight = isPepsi ? '#2a2a3a' : '#ffffff';
-  const innerEar = isPepsi ? '#3a2040' : '#f0b0b8';
-  const noseColor = isPepsi ? '#333' : '#f0a0a8';
-
-  // Cat head (round and cute)
-  ctx.fillStyle = furMain;
-  ctx.beginPath();
-  ctx.arc(cx, cy + 2 * s, b.w * 0.42, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Ears (pointy cat ears)
-  ctx.fillStyle = furMain;
-  ctx.beginPath();
-  ctx.moveTo(cx - 14 * s, cy - 4 * s);
-  ctx.lineTo(cx - 10 * s, cy - 19 * s);
-  ctx.lineTo(cx - 3 * s, cy - 6 * s);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx + 3 * s, cy - 6 * s);
-  ctx.lineTo(cx + 10 * s, cy - 19 * s);
-  ctx.lineTo(cx + 14 * s, cy - 4 * s);
-  ctx.fill();
-  // Inner ears
-  ctx.fillStyle = innerEar;
-  ctx.beginPath();
-  ctx.moveTo(cx - 12 * s, cy - 5 * s);
-  ctx.lineTo(cx - 10 * s, cy - 16 * s);
-  ctx.lineTo(cx - 5 * s, cy - 6 * s);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx + 5 * s, cy - 6 * s);
-  ctx.lineTo(cx + 10 * s, cy - 16 * s);
-  ctx.lineTo(cx + 12 * s, cy - 5 * s);
-  ctx.fill();
-
-  // Eyes (big, cute but evil — slit pupils)
-  const eyePulse = 0.7 + Math.sin(Date.now() / 200) * 0.3;
-  // Eye whites (large, cute)
-  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
-  ctx.beginPath();
-  ctx.ellipse(cx - 8 * s, cy - 1 * s, 4.5 * s, 4 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx + 8 * s, cy - 1 * s, 4.5 * s, 4 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Slit pupils (evil!)
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.ellipse(cx - 8 * s, cy - 1 * s, 1.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx + 8 * s, cy - 1 * s, 1.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Eye glow
-  ctx.save();
-  ctx.globalAlpha = eyePulse * 0.3;
-  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
-  ctx.beginPath();
-  ctx.arc(cx - 8 * s, cy - 1 * s, 6 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx + 8 * s, cy - 1 * s, 6 * s, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Cute nose (small triangle)
-  ctx.fillStyle = noseColor;
-  ctx.beginPath();
-  ctx.moveTo(cx, cy + 3 * s);
-  ctx.lineTo(cx - 2 * s, cy + 5 * s);
-  ctx.lineTo(cx + 2 * s, cy + 5 * s);
-  ctx.fill();
-
-  // Mouth (smug evil smile)
-  ctx.strokeStyle = isPepsi ? '#555' : '#bba0a0';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(cx - 5 * s, cy + 7 * s);
-  ctx.quadraticCurveTo(cx - 2 * s, cy + 10 * s, cx, cy + 7 * s);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx, cy + 7 * s);
-  ctx.quadraticCurveTo(cx + 2 * s, cy + 10 * s, cx + 5 * s, cy + 7 * s);
-  ctx.stroke();
-
-  // Whiskers
-  ctx.strokeStyle = isPepsi ? '#555' : '#ccc';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(cx - 5 * s, cy + 5 * s); ctx.lineTo(cx - 16 * s, cy + 3 * s); ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx - 5 * s, cy + 6 * s); ctx.lineTo(cx - 16 * s, cy + 7 * s); ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx + 5 * s, cy + 5 * s); ctx.lineTo(cx + 16 * s, cy + 3 * s); ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx + 5 * s, cy + 6 * s); ctx.lineTo(cx + 16 * s, cy + 7 * s); ctx.stroke();
-
-  // Tiny fangs peeking out
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.moveTo(cx - 3 * s, cy + 7 * s);
-  ctx.lineTo(cx - 2.5 * s, cy + 10 * s);
-  ctx.lineTo(cx - 2 * s, cy + 7 * s);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(cx + 2 * s, cy + 7 * s);
-  ctx.lineTo(cx + 2.5 * s, cy + 10 * s);
-  ctx.lineTo(cx + 3 * s, cy + 7 * s);
-  ctx.fill();
+  if (style.type === 'dog') {
+    drawBossDog(b, cx, cy, s, style);
+  } else {
+    drawBossCat(b, cx, cy, s, style);
+  }
 
   // Boss name below the face
   const nameY = b.y + b.h + 6;
   const nameBob = Math.sin(Date.now() / 300) * 2;
   const nameSize = Math.max(14, b.w * 0.22);
   ctx.save();
-  ctx.fillStyle = isPepsi ? '#ccff44' : '#66ddff';
+  ctx.fillStyle = style.eyeColor;
   ctx.font = `bold ${nameSize}px monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.shadowColor = isPepsi ? '#ccff44' : '#66ddff';
+  ctx.shadowColor = style.eyeColor;
   ctx.shadowBlur = 10;
   ctx.fillText(b.catName, cx, nameY + nameBob);
   ctx.shadowBlur = 0;
@@ -1808,6 +1709,235 @@ function drawBoss(b) {
   ctx.strokeStyle = '#555';
   ctx.lineWidth = 1;
   ctx.strokeRect(barX, barY, barW, barH);
+}
+
+function drawBossCat(b, cx, cy, s, style) {
+  // Cat head
+  ctx.fillStyle = style.furMain;
+  ctx.beginPath();
+  ctx.arc(cx, cy + 2 * s, b.w * 0.42, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pointy cat ears
+  ctx.fillStyle = style.furMain;
+  ctx.beginPath();
+  ctx.moveTo(cx - 14 * s, cy - 4 * s);
+  ctx.lineTo(cx - 10 * s, cy - 19 * s);
+  ctx.lineTo(cx - 3 * s, cy - 6 * s);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + 3 * s, cy - 6 * s);
+  ctx.lineTo(cx + 10 * s, cy - 19 * s);
+  ctx.lineTo(cx + 14 * s, cy - 4 * s);
+  ctx.fill();
+  // Inner ears
+  ctx.fillStyle = style.innerEar;
+  ctx.beginPath();
+  ctx.moveTo(cx - 12 * s, cy - 5 * s);
+  ctx.lineTo(cx - 10 * s, cy - 16 * s);
+  ctx.lineTo(cx - 5 * s, cy - 6 * s);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5 * s, cy - 6 * s);
+  ctx.lineTo(cx + 10 * s, cy - 16 * s);
+  ctx.lineTo(cx + 12 * s, cy - 5 * s);
+  ctx.fill();
+
+  // Eyes (slit pupils)
+  const eyePulse = 0.7 + Math.sin(Date.now() / 200) * 0.3;
+  ctx.fillStyle = style.eyeColor;
+  ctx.beginPath();
+  ctx.ellipse(cx - 8 * s, cy - 1 * s, 4.5 * s, 4 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 8 * s, cy - 1 * s, 4.5 * s, 4 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(cx - 8 * s, cy - 1 * s, 1.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 8 * s, cy - 1 * s, 1.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye glow
+  ctx.save();
+  ctx.globalAlpha = eyePulse * 0.3;
+  ctx.fillStyle = style.eyeColor;
+  ctx.beginPath();
+  ctx.arc(cx - 8 * s, cy - 1 * s, 6 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + 8 * s, cy - 1 * s, 6 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Nose
+  ctx.fillStyle = style.nose;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 3 * s);
+  ctx.lineTo(cx - 2 * s, cy + 5 * s);
+  ctx.lineTo(cx + 2 * s, cy + 5 * s);
+  ctx.fill();
+
+  // Mouth
+  ctx.strokeStyle = style.mouth;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * s, cy + 7 * s);
+  ctx.quadraticCurveTo(cx - 2 * s, cy + 10 * s, cx, cy + 7 * s);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 7 * s);
+  ctx.quadraticCurveTo(cx + 2 * s, cy + 10 * s, cx + 5 * s, cy + 7 * s);
+  ctx.stroke();
+
+  // Whiskers
+  ctx.strokeStyle = style.whiskers;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * s, cy + 5 * s); ctx.lineTo(cx - 16 * s, cy + 3 * s); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * s, cy + 6 * s); ctx.lineTo(cx - 16 * s, cy + 7 * s); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5 * s, cy + 5 * s); ctx.lineTo(cx + 16 * s, cy + 3 * s); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 5 * s, cy + 6 * s); ctx.lineTo(cx + 16 * s, cy + 7 * s); ctx.stroke();
+
+  // Fangs
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(cx - 3 * s, cy + 7 * s);
+  ctx.lineTo(cx - 2.5 * s, cy + 10 * s);
+  ctx.lineTo(cx - 2 * s, cy + 7 * s);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx + 2 * s, cy + 7 * s);
+  ctx.lineTo(cx + 2.5 * s, cy + 10 * s);
+  ctx.lineTo(cx + 3 * s, cy + 7 * s);
+  ctx.fill();
+}
+
+function drawBossDog(b, cx, cy, s, style) {
+  // Jake — friendly black dog
+
+  // Head (slightly wider, rounder than cats)
+  ctx.fillStyle = style.furMain;
+  ctx.beginPath();
+  ctx.arc(cx, cy + 2 * s, b.w * 0.44, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Floppy ears (drooping down, not pointy!)
+  ctx.fillStyle = style.furDark;
+  ctx.beginPath();
+  ctx.ellipse(cx - 14 * s, cy + 4 * s, 6 * s, 12 * s, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 14 * s, cy + 4 * s, 6 * s, 12 * s, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+  // Inner ears
+  ctx.fillStyle = style.innerEar;
+  ctx.beginPath();
+  ctx.ellipse(cx - 14 * s, cy + 5 * s, 3.5 * s, 8 * s, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + 14 * s, cy + 5 * s, 3.5 * s, 8 * s, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Muzzle (lighter patch)
+  ctx.fillStyle = '#444444';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 5 * s, 7 * s, 5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes (big, round, friendly — not slit!)
+  const eyePulse = 0.8 + Math.sin(Date.now() / 250) * 0.2;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx - 7 * s, cy - 2 * s, 4 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + 7 * s, cy - 2 * s, 4 * s, 0, Math.PI * 2);
+  ctx.fill();
+  // Round pupils (friendly!)
+  ctx.fillStyle = '#332211';
+  ctx.beginPath();
+  ctx.arc(cx - 7 * s, cy - 2 * s, 2.5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + 7 * s, cy - 2 * s, 2.5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye shine
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(cx - 6 * s, cy - 3 * s, 1.2 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + 8 * s, cy - 3 * s, 1.2 * s, 0, Math.PI * 2);
+  ctx.fill();
+  // Eye glow
+  ctx.save();
+  ctx.globalAlpha = eyePulse * 0.2;
+  ctx.fillStyle = style.eyeColor;
+  ctx.beginPath();
+  ctx.arc(cx - 7 * s, cy - 2 * s, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + 7 * s, cy - 2 * s, 5 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Nose (big, round, doggy)
+  ctx.fillStyle = style.nose;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 3 * s, 3 * s, 2 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Nose shine
+  ctx.fillStyle = '#555';
+  ctx.beginPath();
+  ctx.arc(cx - 1 * s, cy + 2.5 * s, 0.8 * s, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Mouth (happy open pant — tongue out!)
+  ctx.strokeStyle = style.mouth;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy + 7 * s, 4 * s, 0.1, Math.PI - 0.1);
+  ctx.stroke();
+  // Tongue
+  ctx.fillStyle = '#ff6688';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 11 * s, 2.5 * s, 3.5 * s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff4466';
+  ctx.beginPath();
+  ctx.moveTo(cx - 1.5 * s, cy + 8 * s);
+  ctx.lineTo(cx - 1.5 * s, cy + 13 * s);
+  ctx.lineTo(cx + 1.5 * s, cy + 13 * s);
+  ctx.lineTo(cx + 1.5 * s, cy + 8 * s);
+  ctx.fill();
+
+  // Eyebrows (friendly raised)
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(cx - 10 * s, cy - 7 * s);
+  ctx.quadraticCurveTo(cx - 7 * s, cy - 9 * s, cx - 4 * s, cy - 6 * s);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + 4 * s, cy - 6 * s);
+  ctx.quadraticCurveTo(cx + 7 * s, cy - 9 * s, cx + 10 * s, cy - 7 * s);
+  ctx.stroke();
+
+  // Wagging tail indicator (small motion lines near bottom)
+  const wag = Math.sin(Date.now() / 100) * 3;
+  ctx.strokeStyle = style.eyeColor;
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(cx + 16 * s + wag, cy - 4 * s);
+  ctx.lineTo(cx + 20 * s + wag * 1.5, cy - 8 * s);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 function drawPowerUp(pu) {
@@ -1896,11 +2026,12 @@ function setupWave() {
   boss = null;
 
   if (isBossWave) {
-    // Boss wave — alternate between Pepsi (black cat) and Cherry (white cat)
+    // Boss wave — cycle: PEPSI → CHERRY → HARRY → JAKE
     const bw = W * 0.25;
     const bh = bw * 0.8;
     const bossIndex = Math.floor(wave / ds.bossEvery);
-    const catName = bossIndex % 2 === 1 ? 'PEPSI' : 'CHERRY';
+    const bossNames = ['PEPSI', 'CHERRY', 'HARRY', 'JAKE'];
+    const catName = bossNames[(bossIndex - 1) % 4];
     boss = {
       x: W / 2 - bw / 2,
       y: 15,
@@ -2019,7 +2150,17 @@ function update(timestamp) {
     } else {
       b.y += b.speed;
     }
-    return b.y < H + 10 && b.y > -10 && b.x > -20 && b.x < W + 20;
+    // Wall bounce for Jake's fetch balls
+    if (b.bouncy && b.vx) {
+      if (b.x < 0 || b.x + b.w > W) {
+        if (b.bouncesLeft > 0) {
+          b.vx *= -1;
+          b.bouncesLeft--;
+          b.x = Math.max(0, Math.min(W - b.w, b.x));
+        }
+      }
+    }
+    return b.y < H + 10 && b.y > -10 && b.x > -30 && b.x < W + 30;
   });
 
   // Update sonic rings (Pepsi's PURR attack)
@@ -2164,25 +2305,28 @@ function updateEnemies(dt) {
 }
 
 function pickSpecialAttack(catName) {
-  if (catName === 'CHERRY') {
-    const attacks = ['claw', 'hiss', 'gotcha'];
-    return attacks[Math.floor(Math.random() * attacks.length)];
-  } else {
-    const attacks = ['purr', 'naptime', 'meow'];
-    return attacks[Math.floor(Math.random() * attacks.length)];
-  }
+  const attackSets = {
+    CHERRY: ['claw', 'hiss', 'gotcha'],
+    PEPSI:  ['purr', 'naptime', 'meow'],
+    HARRY:  ['purr', 'naptime', 'meow'],
+    JAKE:   ['jump', 'fetch', 'woof'],
+  };
+  const attacks = attackSets[catName] || attackSets.PEPSI;
+  return attacks[Math.floor(Math.random() * attacks.length)];
 }
 
 function getTauntText(type) {
   const taunts = {
     claw: 'CLAW!', hiss: 'HISSS!', gotcha: 'GOTCHA!',
     purr: 'PURRRR...', naptime: 'NAP TIME...', meow: 'MEOW!',
+    jump: 'JUMP!', fetch: 'FETCH!', woof: 'WOOF!',
   };
   return taunts[type] || '...';
 }
 
 function getTauntColor(catName) {
-  return catName === 'PEPSI' ? '#ccff44' : '#66ddff';
+  const style = BOSS_STYLES[catName];
+  return style ? style.eyeColor : '#ccff44';
 }
 
 function fireSpecialAttack() {
@@ -2290,6 +2434,64 @@ function fireSpecialAttack() {
         vy: Math.sin(angle) * 4,
       });
     }
+    playBossAppear();
+
+  } else if (type === 'jump') {
+    // Jake JUMPS on you! Boss swoops down toward player then bounces back
+    // Spawn a wave of paw-print bullets raining down from boss position
+    const px = player.x + player.w / 2;
+    for (let i = 0; i < 5; i++) {
+      const spread = (i - 2) * W * 0.06;
+      enemyBullets.push({
+        x: px + spread - 2, y: by,
+        w: 6, h: 6, speed: 6,
+        pawPrint: true,
+      });
+    }
+    // Also spawn expanding shockwave ring where Jake "lands"
+    bossSonicRings.push({
+      x: px, y: player.y - 20,
+      radius: 5, speed: 3,
+      alpha: 0.8, gapAngle: 0, gapSize: 0,
+      color: '#ffaa44',
+    });
+    spawnParticles(cx, by, '#ffaa44', 10);
+    playBossAppear();
+
+  } else if (type === 'fetch') {
+    // Jake throws bouncing balls! 4 bullets that bounce off walls
+    for (let i = 0; i < 4; i++) {
+      const ang = -0.6 + i * 0.4;
+      enemyBullets.push({
+        x: cx - 2, y: by,
+        w: 6, h: 6, speed: 3,
+        vx: ang * 4,
+        vy: 3.5,
+        bouncy: true,
+        bouncesLeft: 2,
+      });
+    }
+    playBossAppear();
+
+  } else if (type === 'woof') {
+    // Big bark shockwave — wide arc of bullets + visual ring
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.PI * 0.15 + (Math.PI * 0.7 / 7) * i;
+      enemyBullets.push({
+        x: cx - 1, y: by,
+        w: 4, h: 6, speed: 0,
+        vx: Math.cos(angle) * 3,
+        vy: Math.sin(angle) * 4,
+      });
+    }
+    // Visual bark ring
+    bossSonicRings.push({
+      x: cx, y: by,
+      radius: 8, speed: 4,
+      alpha: 0.6, gapAngle: 0, gapSize: 0,
+      color: '#ffaa44',
+    });
+    spawnParticles(cx, by, '#ffaa44', 8);
     playBossAppear();
   }
 }
@@ -2714,6 +2916,41 @@ function draw() {
       ctx.font = 'bold 8px monospace';
       ctx.textAlign = 'center';
       ctx.fillText('z', b.x + b.w / 2 + 4, b.y);
+      ctx.restore();
+    } else if (b.pawPrint) {
+      // Jake's paw print bullet
+      const px = b.x + b.w / 2;
+      const py = b.y + b.h / 2;
+      ctx.save();
+      ctx.shadowColor = '#ffaa44';
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = '#ffaa44';
+      // Pad
+      ctx.beginPath();
+      ctx.ellipse(px, py + 1, 3, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Toes
+      ctx.beginPath(); ctx.arc(px - 2.5, py - 2.5, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(px + 2.5, py - 2.5, 1.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(px, py - 3.5, 1.3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    } else if (b.bouncy) {
+      // Jake's bouncy fetch ball
+      const bx = b.x + b.w / 2;
+      const by = b.y + b.h / 2;
+      ctx.save();
+      ctx.shadowColor = '#ffcc44';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#ffcc44';
+      ctx.beginPath();
+      ctx.arc(bx, by, 4, 0, Math.PI * 2);
+      ctx.fill();
+      // Stripe
+      ctx.strokeStyle = '#ff8800';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(bx, by, 3, -0.5, 0.5);
+      ctx.stroke();
       ctx.restore();
     } else {
       drawPitchforkBullet(b.x + b.w / 2, b.y, b.h);
